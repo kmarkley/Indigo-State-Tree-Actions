@@ -41,6 +41,7 @@ class Plugin(indigo.PluginBase):
         self.folderId = self._getFolderId(self.pluginPrefs.get("folderName",None))
         self.logMissing = self.pluginPrefs.get("logMissing", False)
         self.debug = self.pluginPrefs.get("showDebugInfo",False)
+        self.namespaces = self.pluginPrefs.get("namespaces",[])
 
     def shutdown(self):
         self.logger.debug(u"shutdown called")
@@ -55,7 +56,7 @@ class Plugin(indigo.PluginBase):
             self.folderId = self._getFolderId(valuesDict.get("folderName",None))
 
     def validatePrefsConfigUi(self, valuesDict):
-        self.logger.debug(u'Validating Prefs called')
+        self.logger.debug(u"validatePrefsConfigUi")
         errorsDict = indigo.Dict()
         
         if not all(x.isalnum() or x.isspace() for x in valuesDict["folderName"]):
@@ -66,13 +67,15 @@ class Plugin(indigo.PluginBase):
         return (True, valuesDict)
     
     def validateActionConfigUi(self, valuesDict, typeId, devId):
-        self.logger.debug(u"Validating action config for type: " + typeId)
+        self.logger.debug(u"validateActionConfigUi: " + typeId)
         errorsDict = indigo.Dict()
         
         if valuesDict["baseName"] == u'':
             errorsDict["baseName"] = "Base Name must be at least one character long"
         elif any(ch in valuesDict["baseName"] for ch in kBaseReserved):
             errorsDict["baseName"] = "Base Name may not contain:  "+"  ".join(kBaseReserved)
+        elif valuesDict["baseName"] not in self.namespaces:
+            errorsDict["baseName"] = "Base Name does not exist"
             
         if typeId == "enterNewState":
             if valuesDict["stateName"] == u'':
@@ -97,6 +100,10 @@ class Plugin(indigo.PluginBase):
         baseName = action.props.get("baseName")
         newState = action.props.get("stateName")
         self.logger.debug(u"enterNewState: "+baseName+u"|"+newState)
+        valid = self.validateActionConfigUi(action.props, "newState", action.deviceId)[0]
+        if not valid:
+            self.logger.error(u"Action 'Enter New State' failed validation")
+            return
         baseObj  = self.baseState(self, baseName)
         if newState != baseObj.value:
             oldTree  = self.stateTree(self, baseObj, baseObj.value)
@@ -124,6 +131,10 @@ class Plugin(indigo.PluginBase):
         baseName = action.props.get("baseName")
         context  = action.props.get("contextName")
         self.logger.debug(u"addContext: "+baseName+u"+"+context)
+        valid = self.validateActionConfigUi(action.props, "addContext", action.deviceId)[0]
+        if not valid:
+            self.logger.error(u"Action 'Add Context' failed validation")
+            return
         baseObj  = self.baseState(self, baseName)
         if not (context in baseObj.contexts):
             oldTree  = self.stateTree(self, baseObj, baseObj.value)
@@ -137,6 +148,10 @@ class Plugin(indigo.PluginBase):
         baseName = action.props.get("baseName")
         context  = action.props.get("contextName")
         self.logger.debug(u"removeContext: "+baseName+u"+"+context)
+        valid = self.validateActionConfigUi(action.props, "removeContext", action.deviceId)[0]
+        if not valid:
+            self.logger.error(u"Action 'Remove Context' failed validation")
+            return
         baseObj  = self.baseState(self, baseName)
         if (context in baseObj.contexts):
             oldTree  = self.stateTree(self, baseObj, baseObj.value)
@@ -146,6 +161,40 @@ class Plugin(indigo.PluginBase):
             baseObj.contexts.remove(context)
             self._setValue(baseObj.contextVar, baseObj.contexts)
         
+    
+    ########################################
+    # Menu Methods
+    ########################################
+    
+    def changeNamespace(self, valuesDict="", typeId=""):
+        self.logger.debug(u"changeNamespace: " + typeId)
+        errorsDict = indigo.Dict()
+        baseName = valuesDict.get("baseName")
+        if valuesDict["baseName"] == u'':
+            errorsDict["baseName"] = "Base Name must be at least one character long"
+        elif any(ch in valuesDict["baseName"] for ch in kBaseReserved):
+            errorsDict["baseName"] = "Base Name may not contain:  "+"  ".join(kBaseReserved)
+        if typeId == "addNamespace":
+            if not baseName in self.namespaces:
+                self.namespaces.append(baseName)
+            else:
+                errorsDict["baseName"] = "Base Name already exist"
+        elif typeId == "removeNamespace":
+            if  baseName in self.namespaces:
+                self.namespaces.remove(baseName)
+            else:
+                errorsDict["baseName"] = "Base Name does not exist"
+        self.pluginPrefs["namespaces"] = self.namespaces
+        if len(errorsDict) > 0:
+            return (False, valuesDict, errorsDict)
+        return (True, valuesDict)
+    
+    def listNamespaces(self, filter="", valuesDict=None, typeId="", targetId=0):
+        listArray = []
+        for baseName in self.namespaces:
+            listArray.append((baseName,baseName))
+        return listArray
+    
     
     ########################################
     # Classes

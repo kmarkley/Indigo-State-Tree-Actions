@@ -165,22 +165,28 @@ If checked, extensive debug information will be written to the log.
 
 ## Usage
 
+### Defining Namespaces
+
+Use the plugin's menu items to add or remove namespaces. Removed namespaces will not delete anything, but will cause existing actions to fail validation.
+
+### Actions
+
 The plugin defines new **actions**, but no new devices or triggers.
 
-#### Enter New State
+##### Enter New State
 
-**Base Name**: the namespace of the state tree.
+_Base Name_: the namespace of the state tree.
 
-**New Sate**: the new state the system should enter.  Should be in state1>state2>state3 format.  Do not include any contexts.
+_New State_: the new state the system should enter.  Should be in state1>state2>state3 format.  Do not include any contexts.
 
-#### Add Context
+##### Add Context
 
-**Base Name**: the namespace of the state tree.
+_Base Name_: the namespace of the state tree.
 
-**Context**: The context to be added.  Do ***not*** includ the plus ('+') character.
+_Context_: The context to be added.  Do ***not*** includ the plus ('+') character.
 
-#### Remove Context
+##### Remove Context
 
-**Base Name**: the namespace of the state tree.
+_Base Name_: the namespace of the state tree.
 
-**Context**: The context to be removed.  Do ***not*** includ the plus ('+') character.
+_Context_: The context to be removed.  Do ***not*** includ the plus ('+') character.

@@ -4,11 +4,9 @@
 		<Name>Enter New State</Name>
 		<CallbackMethod>enterNewState</CallbackMethod>
 		<ConfigUI>
-			<Field id="baseName" type="textfield">
+			<Field id="baseName" type="menu">
 				<Label>Base Name:</Label>
-			</Field>
-			<Field id="baseLabel" type="label" fontColor="darkgray" fontSize="small" alignWithControl="true">
-				<Label>The Base Name of the state tree.</Label>
+                <List class="self" method="listNamespaces"/>
 			</Field>
 			<Field id="stateName" type="textfield">
 				<Label>New State:</Label>
@@ -22,11 +20,9 @@
 		<Name>Add Context</Name>
 		<CallbackMethod>addContext</CallbackMethod>
 		<ConfigUI>
-			<Field id="baseName" type="textfield">
+			<Field id="baseName" type="menu">
 				<Label>Base Name:</Label>
-			</Field>
-			<Field id="baseLabel" type="label" fontColor="darkgray" fontSize="small" alignWithControl="true">
-				<Label>The Base Name of the state tree.</Label>
+                <List class="self" method="listNamespaces"/>
 			</Field>
 			<Field id="contextName" type="textfield">
 				<Label>Context to add:</Label>
@@ -37,11 +33,9 @@
 		<Name>Remove Context</Name>
 		<CallbackMethod>removeContext</CallbackMethod>
 		<ConfigUI>
-			<Field id="baseName" type="textfield">
+			<Field id="baseName" type="menu">
 				<Label>Base Name:</Label>
-			</Field>
-			<Field id="baseLabel" type="label" fontColor="darkgray" fontSize="small" alignWithControl="true">
-				<Label>The Base Name of the state tree.</Label>
+                <List class="self" method="listNamespaces"/>
 			</Field>
 			<Field id="contextName" type="textfield">
 				<Label>Context to remove:</Label>

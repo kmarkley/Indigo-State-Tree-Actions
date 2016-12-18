@@ -11,7 +11,7 @@
     </Field>
     <Field type="checkbox" id="logMissing" defaultValue="false">
         <Label>Log Missing Action Groups:</Label>
-        <Description>Useful to see Action Groups you may wish to create.   </Description>
+        <Description>Useful to list Action Groups you may wish to create.   </Description>
     </Field>
     <Field id="spacer2" type="label" fontColor="darkgray" fontSize="small" alignWithControl="true">
         <Label> </Label>

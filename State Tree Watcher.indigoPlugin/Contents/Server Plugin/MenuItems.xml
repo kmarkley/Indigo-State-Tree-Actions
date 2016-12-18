@@ -6,10 +6,29 @@
 	 back to the user you can post information into the Event Log.
 -->
 <MenuItems>
-	<!-- 
-	<MenuItem id="menu1">
-		<Name>Something</Name>
-		<CallbackMethod>somethingFunc</CallbackMethod>
+	<MenuItem id="addNamespace">
+		<Name>Add Namespace</Name>
+		<CallbackMethod>changeNamespace</CallbackMethod>
+		<ConfigUI>
+			<Field id="baseName" type="textfield">
+				<Label>Base Name:</Label>
+			</Field>
+			<Field id="baseLabel" type="label" fontColor="darkgray" fontSize="small" alignWithControl="true">
+				<Label>The Base Name of the state tree.</Label>
+			</Field>
+		</ConfigUI>
 	</MenuItem>
-	-->
+	<MenuItem id="removeNamespace">
+		<Name>Remove Namespace</Name>
+		<CallbackMethod>changeNamespace</CallbackMethod>
+		<ConfigUI>
+			<Field id="baseName" type="menu">
+				<Label>Base Name:</Label>
+                <List class="self" method="listNamespaces"/>
+			</Field>
+			<Field id="baseLabel" type="label" fontColor="darkgray" fontSize="small" alignWithControl="true">
+				<Label>Removing a namespace will not delete anything.  It will cause existing actions to fail validation.</Label>
+			</Field>
+		</ConfigUI>
+	</MenuItem>
 </MenuItems>
