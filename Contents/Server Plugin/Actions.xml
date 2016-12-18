@@ -1,0 +1,51 @@
+<?xml version="1.0"?>
+<Actions>
+	<Action id="enterNewState">
+		<Name>Enter New State</Name>
+		<CallbackMethod>enterNewState</CallbackMethod>
+		<ConfigUI>
+			<Field id="baseName" type="textfield">
+				<Label>Base Name:</Label>
+			</Field>
+			<Field id="baseLabel" type="label" fontColor="darkgray" fontSize="small" alignWithControl="true">
+				<Label>The Base Name of the state tree.</Label>
+			</Field>
+			<Field id="stateName" type="textfield">
+				<Label>New State:</Label>
+			</Field>
+			<Field id="enterNewStateValueLabel" type="label" fontColor="darkgray" fontSize="small" alignWithControl="true">
+				<Label>The name of the new state.  Must follow naming conventions.</Label>
+			</Field>
+		</ConfigUI>
+	</Action>
+	<Action id="addContext">
+		<Name>Add Context</Name>
+		<CallbackMethod>addContext</CallbackMethod>
+		<ConfigUI>
+			<Field id="baseName" type="textfield">
+				<Label>Base Name:</Label>
+			</Field>
+			<Field id="baseLabel" type="label" fontColor="darkgray" fontSize="small" alignWithControl="true">
+				<Label>The Base Name of the state tree.</Label>
+			</Field>
+			<Field id="contextName" type="textfield">
+				<Label>Context to add:</Label>
+			</Field>
+		</ConfigUI>
+	</Action>
+	<Action id="removeContext">
+		<Name>Remove Context</Name>
+		<CallbackMethod>removeContext</CallbackMethod>
+		<ConfigUI>
+			<Field id="baseName" type="textfield">
+				<Label>Base Name:</Label>
+			</Field>
+			<Field id="baseLabel" type="label" fontColor="darkgray" fontSize="small" alignWithControl="true">
+				<Label>The Base Name of the state tree.</Label>
+			</Field>
+			<Field id="contextName" type="textfield">
+				<Label>Context to remove:</Label>
+			</Field>
+		</ConfigUI>
+	</Action>
+</Actions>
