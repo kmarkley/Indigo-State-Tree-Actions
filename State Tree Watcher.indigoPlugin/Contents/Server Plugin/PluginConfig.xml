@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <PluginConfig>	
     <Field type="textfield" id="folderName" defaultValue="State Tree Watcher">
-        <Label>Folder for variables:</Label>
+        <Label>Folder for Variables:</Label>
     </Field>
     <Field id="folderLabel" type="label" fontColor="darkgray" fontSize="small" alignWithControl="true">
         <Label>Variables will be moved to new folder as the are accessed.  Leave blank for no folder.</Label>

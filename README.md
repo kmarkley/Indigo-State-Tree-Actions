@@ -4,11 +4,12 @@
 
 ## Overview
 
-This plugin creates actions to automate execution of multiple **Action Groups** based on a hierarchical tree-like structure of _states_.  Additional **Action Groups** are executed for each state depending on multiple inherited _contexts_.  The system is analogous to method hooks in software development.
+This plugin creates actions to automate execution of multiple Action Groups based on a hierarchical tree-like structure of '_states_'.  Additional Action Groups are executed for each state depending on multiple inherited '_contexts_'.  The system is analogous to hooks in software development.
 
-Additionally the plugin creates and maintains multiple **Variables** that track each _state_ for use in **Schedule** and/or **Trigger** conditinals.
+Additionally the plugin creates and maintains multiple Variables that track each '_state_' for use in Schedule and/or Trigger conditinals.
 
 ## Details
+
 #### State Changes
 
 Imagine a simple set of nested/hierarchical states like this:
@@ -25,17 +26,17 @@ Each state is mutually-exclusive (you can't be both asleep and awake).
 
 Indigo's example variable-wather.py script would enable executing an Action Group associated with each state. However, when exiting a state one might reasonable want to un-do whatever actions were taken when entering.
 
-When changing from one state to another, plugin will traverse 'up' the hierarchy of states being exited, attempting to execute an Action Group at each step, then traverse 'down' the hierachy, atempting to execute mor Action Groups for each state entered.
+When changing from one state to another, this plugin will traverse 'up' the hierarchy of states being exited, attempting to execute an Action Group at each step, then traverse 'down' the hierachy, attempting to execute more Action Groups for each state entered.
 
-Additionally, the plugin will attempt to execute a global enter and global exit Action Group any time there is any change in state.
+Additionally, the plugin will attempt to execute a global enter and global exit Action Group whenever there is any change in state.
 
 In the example above, when switching from the 'Work' state to the 'Wake' state, the plugin will try to execute these Action Groups:
 
 	Global Enter
-	Exit 'Work'
-	Exit 'Away'
-	Enter 'Home'
-	Enter 'Wake'
+	Exit Work
+	Exit Away
+	Enter Home
+	Enter Wake
 	Global Exit
 
 #### Contexts
@@ -48,17 +49,17 @@ For example, you may be at work when it is dark, or at home when it is dark.  Yo
 
 For every combination of states and contexts, both an enter Action Group and an exit Action Group may be executed.  
 
-So again in the example above, when switching from the 'Work' state to the 'Wake' state when dark, the following Action Groups may be executed:
+So again in the example above, when switching from the 'Work' state to the 'Wake' state when dark, the following Action Groups might be executed:
 
 	Global Enter
-	Exit 'Work/Dark'
-	Exit 'Work'
-	Exit 'Away/Dark'
-	Exit 'Away'
-	Enter 'Home'
-	Enter 'Home/Dark'
-	Enter 'Wake'
-	Enter 'Wake/Dark'
+	Exit Work/Dark
+	Exit Work
+	Exit Away/Dark
+	Exit Away
+	Enter Home
+	Enter Home/Dark
+	Enter Wake
+	Enter Wake/Dark
 	Global Exit
 
 Importantly, ***any Action Group that does not exist will be silently skipped***.
@@ -66,9 +67,9 @@ Importantly, ***any Action Group that does not exist will be silently skipped***
 
 ## Naming Conventions
 
-All this is accomplished using strict naming conventions for Action Groups.
+All this is accomplished using **strict naming conventions** for Action Groups.
 
-Each state change must have a **Base Name** that defines the namespace for all Action Groups.  In the example above, theis is 'HouseState'.  This is also the name of the global enter Action Group.
+Each state change must have a '_Base Name_' that defines the namespace for all Action Groups.  In the example above, this is 'HouseState'.  This is also the name of the global enter Action Group.
 
 The pipe ('|') character is used to separate the Base Name from the rest of the Action Group name.
 
@@ -128,15 +129,58 @@ This makes it very easy to refer to the current state, or any of it's parent-sta
 
 The plugin maintains a few other Variables as well.
 
-A variable with the same name a the Base Name alwys holds the current state:
+A variable with the same name a the Base Name always holds the current state:
 
 	HouseState					Home>Wake
 
-There is a variable to store contexts:
+There is a variable to store contexts _(note the double-underscore)_:
 
 	HouseState__Context			[u'Dark',u'Rain']
 
-And another for a time stamp:
+And another for a time stamp _(note the double-underscore)_:
 
 	HouseState__LastChange		2016-12-17 20:44:04.313000
 
+---
+
+## Installation
+
+Install like any other Indigo Plugin.
+
+## Configuration
+
+#### Folder for Variables
+
+Enter a name for the folder where the plugin's variables will be stored.  The folder will be created if it doesn't exist.
+
+If you change folders, variables will be migrated to the new folder ***as they are accessed***.  Variables may be moved manually to the new folder.
+
+#### Log Missing Action Groups
+
+If checked, any Action Group that doesn't exist will be written to the log.  This is a handy way to get names of additional Action Groups that you may wish to create.
+
+#### Enable Debugging
+
+If checked, extensive debug information will be written to the log.
+
+## Usage
+
+The plugin defines new **actions**, but no new devices or triggers.
+
+#### Enter New State
+
+**Base Name**: the namespace of the state tree.
+
+**New Sate**: the new state the system should enter.  Should be in state1>state2>state3 format.  Do not include any contexts.
+
+#### Add Context
+
+**Base Name**: the namespace of the state tree.
+
+**Context**: The context to be added.  Do ***not*** includ the plus ('+') character.
+
+#### Remove Context
+
+**Base Name**: the namespace of the state tree.
+
+**Context**: The context to be removed.  Do ***not*** includ the plus ('+') character.
