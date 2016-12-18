@@ -61,7 +61,7 @@ So again in the example above, when switching from the 'Work' state to the 'Wake
 	Enter 'Wake/Dark'
 	Global Exit
 
-Importantly, *** any Action Group that does not exist will be silently skipped***.
+Importantly, ***any Action Group that does not exist will be silently skipped***.
 
 
 ## Naming Conventions
@@ -91,7 +91,7 @@ So, using the same example, these are the Action Group names the plugin will att
 	HouseState|Home>Wake+Dark
 	HouseState*
 
-Again, *** any Action Group that does not exist will be silently skipped***. You can create whichever ones make sense for you and ignore the rest.
+Again, ***any Action Group that does not exist will be silently skipped***. You can create whichever ones make sense for you and ignore the rest.
 
 When contexts are changed, the plugin will update every state in the hierarchy to reflect the change.  
 
@@ -109,6 +109,8 @@ And now let's say that morning breaks and the 'Dark' context is removed:
 
 ## Variables
 
+#### State Variables
+
 The plugin will also create and maintain Variables for every state. Variable names will follow Action Group names, but with all the special characters replaced with the underscore ('_') character.
 
 After the above state change, the variables will be:
@@ -121,6 +123,8 @@ After the above state change, the variables will be:
 	HouseState_Home_Wake		True
 
 This makes it very easy to refer to the current state, or any of it's parent-states in conditional for Schedules and Triggers.
+
+#### Other Variables
 
 The plugin maintains a few other Variables as well.
 
