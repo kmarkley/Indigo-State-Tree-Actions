@@ -179,14 +179,20 @@ _Base Name_: the namespace of the state tree.
 
 _New State_: the new state the system should enter.  Should be in state1>state2>state3 format.  Do not include any contexts.
 
+##### Variable to State
+
+_Base Name_: the namespace of the state tree.
+
+_Variable_: a variable whose value will be used as the _New State_.
+
 ##### Add Context
 
 _Base Name_: the namespace of the state tree.
 
-_Context_: The context to be added.  Do ***not*** includ the plus ('+') character.
+_Context_: The context to be added.  Do ***not*** include the plus ('+') character.
 
 ##### Remove Context
 
 _Base Name_: the namespace of the state tree.
 
-_Context_: The context to be removed.  Do ***not*** includ the plus ('+') character.
+_Context_: The context to be removed.  Do ***not*** include the plus ('+') character.

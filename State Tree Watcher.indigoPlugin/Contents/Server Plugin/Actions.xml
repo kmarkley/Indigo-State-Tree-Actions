@@ -16,6 +16,20 @@
 			</Field>
 		</ConfigUI>
 	</Action>
+	<Action id="variableToState">
+		<Name>Variable To State</Name>
+		<CallbackMethod>variableToState</CallbackMethod>
+		<ConfigUI>
+			<Field id="baseName" type="menu">
+				<Label>Base Name:</Label>
+                <List class="self" method="listNamespaces"/>
+			</Field>
+			<Field id="stateVarId" type="menu">
+				<Label>Variable:</Label>
+                <List class="indigo.variables"/>
+			</Field>
+		</ConfigUI>
+	</Action>
 	<Action id="addContext">
 		<Name>Add Context</Name>
 		<CallbackMethod>addContext</CallbackMethod>

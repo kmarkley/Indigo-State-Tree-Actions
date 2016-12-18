@@ -56,7 +56,7 @@ class Plugin(indigo.PluginBase):
             self.folderId = self._getFolderId(valuesDict.get("folderName",None))
 
     def validatePrefsConfigUi(self, valuesDict):
-        self.logger.debug(u"validatePrefsConfigUi")
+        self.logger.debug(u"callback 'validatePrefsConfigUi'")
         errorsDict = indigo.Dict()
         
         if not all(x.isalnum() or x.isspace() for x in valuesDict["folderName"]):
@@ -66,27 +66,37 @@ class Plugin(indigo.PluginBase):
             return (False, valuesDict, errorsDict)
         return (True, valuesDict)
     
-    def validateActionConfigUi(self, valuesDict, typeId, devId):
-        self.logger.debug(u"validateActionConfigUi: " + typeId)
+    def validateActionConfigUi(self, valuesDict, typeId, devId, runtime=False):
+        self.logger.debug(u"callback 'validateActionConfigUi': " + typeId)
         errorsDict = indigo.Dict()
         
-        if valuesDict["baseName"] == u'':
-            errorsDict["baseName"] = "Base Name must be at least one character long"
-        elif any(ch in valuesDict["baseName"] for ch in kBaseReserved):
-            errorsDict["baseName"] = "Base Name may not contain:  "+"  ".join(kBaseReserved)
-        elif valuesDict["baseName"] not in self.namespaces:
-            errorsDict["baseName"] = "Base Name does not exist"
+        if valuesDict.get("baseName",u'') == u'':
+            errorsDict["baseName"] = u"Base Name must be at least one character long"
+        elif any(ch in valuesDict.get("baseName",u'') for ch in kBaseReserved):
+            errorsDict["baseName"] = u"Base Name may not contain:  "+"  ".join(kBaseReserved)
+        elif valuesDict.get("baseName",u'') not in self.namespaces:
+            errorsDict["baseName"] = u"Base Name does not exist"
             
         if typeId == "enterNewState":
-            if valuesDict["stateName"] == u'':
-                errorsDict["stateName"] = "State Name must be at least one character long"
-            elif any(ch in valuesDict["stateName"] for ch in kStateReserved):
-                errorsDict["stateName"] = "State Name may not contain:  "+"  ".join(kStateReserved)
+            if valuesDict.get("stateName",u'') == u'':
+                errorsDict["stateName"] = u"State Name must be at least one character long"
+            elif any(ch in valuesDict.get("stateName",u'') for ch in kStateReserved):
+                errorsDict["stateName"] = u"State Name may not contain:  "+"  ".join(kStateReserved)
         elif typeId in ("addContext","removeContext"):
-            if valuesDict["contextName"] == u'':
-                errorsDict["contextName"] = "Context must be at least one character long"
-            elif any(ch in valuesDict["contextName"] for ch in kBaseReserved):
-                errorsDict["contextName"] = "Context may not contain:  "+"  ".join(kBaseReserved)
+            if valuesDict.get("contextName",u'') == u'':
+                errorsDict["contextName"] = u"Context must be at least one character long"
+            elif any(ch in valuesDict.get("contextName",u'') for ch in kBaseReserved):
+                errorsDict["contextName"] = u"Context may not contain:  "+"  ".join(kBaseReserved)
+        elif typeId == "variableToState":
+            if valuesDict.get("stateVarId",u'') == u'':
+                self.logger.error("No variable defined")
+                errorsDict["stateVarId"] = u"No variable defined"
+            elif runtime:
+                var = indigo.variables[int(valuesDict.get("stateVarId",u''))]
+                if var.value == u'':
+                    errorsDict["stateVarId"] = u"State Name must be at least one character long"
+                elif any(ch in var.value for ch in kStateReserved):
+                    errorsDict["stateVarId"] = u"State Name may not contain:  "+"  ".join(kStateReserved)
         
         if len(errorsDict) > 0:
             return (False, valuesDict, errorsDict)
@@ -99,65 +109,68 @@ class Plugin(indigo.PluginBase):
     def enterNewState(self, action):
         baseName = action.props.get("baseName")
         newState = action.props.get("stateName")
-        self.logger.debug(u"enterNewState: "+baseName+u"|"+newState)
-        valid = self.validateActionConfigUi(action.props, "newState", action.deviceId)[0]
-        if not valid:
-            self.logger.error(u"Action 'Enter New State' failed validation")
+        self.logger.debug(u"action 'enterNewState': "+baseName+u"|"+newState)
+        valid = self.validateActionConfigUi(action.props, "newState", action.deviceId, runtime=True)
+        if not valid[0]:
+            self.logger.error(u"Action 'Variable To State' failed validation")
+            for key in valid[2]:
+                self.logger.error(unicode(valid[2][key]))
             return
-        baseObj  = self.baseState(self, baseName)
-        if newState != baseObj.value:
-            oldTree  = self.stateTree(self, baseObj, baseObj.value)
-            newTree  = self.stateTree(self, baseObj, newState)
-            # execute global enter action group
-            baseObj.enter()
-            # back out old tree until it matches new tree
-            matchList = list(item.name for item in newTree.states)
-            for i, item in reversed(list(enumerate(oldTree.states))):
-                if item.name in matchList:
-                    i += 1
-                    break
-                item.exit()
-            else: i = 0   # if oldTree is empty, i won't initialize
-            # enter new tree from matching point
-            for item in newTree.states[i:]:
-                item.enter()
-            # execute global exit action group
-            baseObj.exit()
-            # save new state to variable for next time
-            self._setValue(baseObj.var, newState)
-            self._setValue(baseObj.changedVar, indigo.server.getTime())
+        self._doStateChange(baseName, newState)
+        
+    def variableToState (self, action):
+        baseName = action.props.get("baseName")
+        stateVarId = action.props.get("stateVarId")
+        self.logger.debug(u"action 'variableToState': "+baseName+u" ["+stateVarId+u"]")
+        valid = self.validateActionConfigUi(action.props, "variableToState", action.deviceId, runtime=True)
+        if not valid[0]:
+            self.logger.error(u"Action 'Variable To State' failed validation")
+            for key in valid[2]:
+                self.logger.error(unicode(valid[2][key]))
+            return
+        self._doStateChange(baseName, indigo.variables[int(stateVarId)].value)
     
     def addContext(self, action):
         baseName = action.props.get("baseName")
         context  = action.props.get("contextName")
-        self.logger.debug(u"addContext: "+baseName+u"+"+context)
-        valid = self.validateActionConfigUi(action.props, "addContext", action.deviceId)[0]
-        if not valid:
-            self.logger.error(u"Action 'Add Context' failed validation")
+        self.logger.debug(u"action 'addContext': "+baseName+u"+"+context)
+        valid = self.validateActionConfigUi(action.props, "addContext", action.deviceId, runtime=True)
+        if not valid[0]:
+            self.logger.error(u"Action 'Variable To State' failed validation")
+            for key in valid[2]:
+                self.logger.error(unicode(valid[2][key]))
             return
         baseObj  = self.baseState(self, baseName)
         if not (context in baseObj.contexts):
             oldTree  = self.stateTree(self, baseObj, baseObj.value)
+            # execute global context action group
             self._execute(baseObj.enterAction+kContextChar+context)
+            # execute context action group for each nested state
             for item in oldTree.states:
                 self._execute(item.enterAction+kContextChar+context)
+            # save the new context list
             baseObj.contexts.append(context)
             self._setValue(baseObj.contextVar, baseObj.contexts)
     
     def removeContext(self, action):
         baseName = action.props.get("baseName")
         context  = action.props.get("contextName")
-        self.logger.debug(u"removeContext: "+baseName+u"+"+context)
-        valid = self.validateActionConfigUi(action.props, "removeContext", action.deviceId)[0]
-        if not valid:
-            self.logger.error(u"Action 'Remove Context' failed validation")
+        self.logger.debug(u"action 'removeContext': "+baseName+u"+"+context)
+        valid = self.validateActionConfigUi(action.props, "removeContext", action.deviceId, runtime=True)
+        if not valid[0]:
+            self.logger.error(u"Action 'Variable To State' failed validation")
+            for key in valid[2]:
+                self.logger.error(unicode(valid[2][key]))
             return
         baseObj  = self.baseState(self, baseName)
         if (context in baseObj.contexts):
             oldTree  = self.stateTree(self, baseObj, baseObj.value)
+            # execute context action group for each nested state (reverse order)
             for item in oldTree.states[::-1]:
                 self._execute(item.enterAction+kContextChar+context+kExitChar)
+            # execute global context action group
             self._execute(baseObj.enterAction+kContextChar+context+kExitChar)
+            # save the new context list
             baseObj.contexts.remove(context)
             self._setValue(baseObj.contextVar, baseObj.contexts)
         
@@ -167,7 +180,7 @@ class Plugin(indigo.PluginBase):
     ########################################
     
     def changeNamespace(self, valuesDict="", typeId=""):
-        self.logger.debug(u"changeNamespace: " + typeId)
+        self.logger.debug(u"menu 'changeNamespace': " + typeId)
         errorsDict = indigo.Dict()
         baseName = valuesDict.get("baseName")
         if valuesDict["baseName"] == u'':
@@ -203,7 +216,7 @@ class Plugin(indigo.PluginBase):
     # defines the namespace for hierarchical state trees
     class baseState(object):
         def __init__(self, pluginObj, baseName):
-            pluginObj.logger.debug(u"baseState: "+baseName)
+            pluginObj.logger.debug(u"class 'baseState': "+baseName)
             self.name           = baseName
             self.var            = pluginObj._getVariable(self.name)
             self.value          = self.var.value
@@ -226,7 +239,7 @@ class Plugin(indigo.PluginBase):
     # a single state within the hierarchy
     class singleState(object):
         def __init__(self, pluginObj, baseObj, stateName):
-            pluginObj.logger.debug(u"singleState: "+stateName)
+            pluginObj.logger.debug(u"class 'singleState': "+stateName)
             self.name           = stateName
             self.var            = pluginObj._getVariable(baseObj.name+kBaseChar+stateName)
             self.enterAction    = baseObj.name+kBaseChar+stateName
@@ -252,7 +265,7 @@ class Plugin(indigo.PluginBase):
     # a full list of nested states
     class stateTree(object):
         def __init__(self, pluginObj, baseObj, stateName):
-            pluginObj.logger.debug(u"stateTree: "+stateName)
+            pluginObj.logger.debug(u"class 'stateTree': "+stateName)
             self.states = []
             if stateName != u'':
                 branches    = stateName.split(kStateChar)
@@ -268,9 +281,35 @@ class Plugin(indigo.PluginBase):
     # Utilities
     ########################################
 
+    
+    def _doStateChange(self, baseName, newState):
+        self.logger.debug(u"utility '_doStateChange': "+baseName+u"|"+newState)
+        baseObj  = self.baseState(self, baseName)
+        if newState != baseObj.value:
+            oldTree  = self.stateTree(self, baseObj, baseObj.value)
+            newTree  = self.stateTree(self, baseObj, newState)
+            # save new state and timestamp to variables
+            self._setValue(baseObj.var, newState)
+            self._setValue(baseObj.changedVar, indigo.server.getTime())
+            # execute global enter action group
+            baseObj.enter()
+            # back out old tree until it matches new tree
+            matchList = list(item.name for item in newTree.states)
+            for i, item in reversed(list(enumerate(oldTree.states))):
+                if item.name in matchList:
+                    i += 1
+                    break
+                item.exit()
+            else: i = 0   # if oldTree is empty, i won't initialize
+            # enter new tree from matching point
+            for item in newTree.states[i:]:
+                item.enter()
+            # execute global exit action group
+            baseObj.exit()
+    
     # Action Groups
     def _execute(self, groupName):
-        self.logger.debug(u"_execute: "+groupName)
+        self.logger.debug(u"utility '_execute': "+groupName)
         try:
             indigo.actionGroup.execute(groupName)
         except:
@@ -293,7 +332,7 @@ class Plugin(indigo.PluginBase):
             return str
         
         fixedName = unicode(varNameFix(name, strip))
-        self.logger.debug(u"_getVariable: "+fixedName)
+        self.logger.debug(u"utility '_getVariable': "+fixedName)
         if force:
             try:
                 var = indigo.variable.create(fixedName, folder=self.folderId)
@@ -312,10 +351,10 @@ class Plugin(indigo.PluginBase):
         return var
     
     def _getFolderId(self, name):
-        self.logger.debug(u"_getFolderId: "+name)
+        self.logger.debug(u"utility '_getFolderId': "+name)
         if name:
             if name not in indigo.variables.folders:
-                folder = indigo.variables.folder.create(valuesDict.get("folderName"))
+                folder = indigo.variables.folder.create(name)
             else:
                 folder = indigo.variables.folders[name]
             return folder.id
