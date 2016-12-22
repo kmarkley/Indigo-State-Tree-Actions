@@ -340,7 +340,7 @@ class Plugin(indigo.PluginBase):
                 if e.message == "NameNotUniqueError":
                     var = indigo.variables[fixedName]
                 else:
-                    self.logger.error("Variable error: %s" % (str(e)), isErr=True)
+                    self.logger.error("Variable error: %s" % (str(e)))
         else:
             try:
                 var = indigo.variables[fixedName]

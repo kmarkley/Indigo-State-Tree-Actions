@@ -123,7 +123,7 @@ After the above state change, the variables will be:
 	HouseState_Home_Sleep		False
 	HouseState_Home_Wake		True
 
-This makes it very easy to refer to the current state, or any of it's parent-states in conditional for Schedules and Triggers.
+This makes it very easy to refer any state in Conditions for Schedules and Triggers.
 
 #### Other Variables
 
