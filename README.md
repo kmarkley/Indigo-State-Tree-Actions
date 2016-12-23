@@ -6,7 +6,7 @@
 
 This plugin creates actions to automate execution of multiple Action Groups based on a hierarchical tree-like structure of '_states_'.  Additional Action Groups are executed for each state depending on multiple inherited '_contexts_'.  The system is analogous to hooks in software development.
 
-Additionally the plugin creates and maintains multiple Variables that track each '_state_' for use in Schedule and/or Trigger conditinals.
+Additionally the plugin creates and maintains multiple Variables that track each '_state_' for use in Schedule and/or Trigger conditions.
 
 ## Details
 
@@ -24,7 +24,7 @@ Imagine a simple set of nested/hierarchical states like this:
 
 Each state is mutually-exclusive (you can't be both asleep and awake).
 
-Indigo's example variable-wather.py script would enable executing an Action Group associated with each state. However, when exiting a state one might reasonable want to un-do whatever actions were taken when entering.
+Indigo's example variable-watcher.py script would enable executing an Action Group associated with each state. However, when exiting a state one might reasonable want to un-do whatever actions were taken when entering.
 
 When changing from one state to another, this plugin will traverse 'up' the hierarchy of states being exited, attempting to execute an Action Group at each step, then traverse 'down' the hierachy, attempting to execute more Action Groups for each state entered.
 
@@ -112,7 +112,7 @@ And now let's say that morning breaks and the 'Dark' context is removed:
 
 #### State Variables
 
-The plugin will also create and maintain Variables for every state. Variable names will follow Action Group names, but with all the special characters replaced with the underscore ('_') character.
+The plugin will also create and maintain Variables for every state in the tree. Variable names will follow Action Group names, but with all the special characters replaced with the underscore ('_') character.
 
 After the above state change, the variables will be:
 
@@ -153,7 +153,7 @@ Install like any other Indigo Plugin.
 
 Enter a name for the folder where the plugin's variables will be stored.  The folder will be created if it doesn't exist.
 
-If you change folders, variables will be migrated to the new folder ***as they are accessed***.  Variables may be moved manually to the new folder.
+If you change folders, variables will be migrated to the new folder ***as they are accessed***.  Variables may also be moved manually to the new folder.
 
 #### Log Missing Action Groups
 
@@ -173,26 +173,34 @@ Use the plugin's menu items to add or remove namespaces. Removed namespaces will
 
 The plugin defines new **actions**, but no new devices or triggers.
 
-##### Enter New State
+#### Enter New State
 
-_Base Name_: the namespace of the state tree.
+* **Base Name**  
+the namespace of the state tree.
 
-_New State_: the new state the system should enter.  Should be in state1>state2>state3 format.  Do not include any contexts.
+* **New State**  
+the new state the system should enter.  Should be in state1>state2>state3 format.  Do not include any contexts.
 
-##### Variable to State
+#### Variable to State
 
-_Base Name_: the namespace of the state tree.
+* **Base Name**  
+the namespace of the state tree.
 
-_Variable_: a variable whose value will be used as the _New State_.
+* **Variable**  
+a variable whose value will be used as the _New State_.
 
-##### Add Context
+#### Add Context
 
-_Base Name_: the namespace of the state tree.
+* **Base Name**  
+the namespace of the state tree.
 
-_Context_: The context to be added.  Do ***not*** include the plus ('+') character.
+* **Context**  
+The context to be added.  Do ***not*** include the plus ('+') character.
 
-##### Remove Context
+#### Remove Context
 
-_Base Name_: the namespace of the state tree.
+* **Base Name**  
+the namespace of the state tree.
 
-_Context_: The context to be removed.  Do ***not*** include the plus ('+') character.
+* **Context**  
+The context to be removed.  Do ***not*** include the plus ('+') character.
