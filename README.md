@@ -149,19 +149,17 @@ Install like any other Indigo Plugin.
 
 ## Configuration
 
-#### Folder for Variables
+* **Folder for Variables**  
+Enter a name for the folder where the plugin's variables will be stored.  The folder will be created if it doesn't exist.  If you change folders, variables will be migrated to the new folder ***as they are accessed***.  Variables may also be moved manually to the new folder.
 
-Enter a name for the folder where the plugin's variables will be stored.  The folder will be created if it doesn't exist.
-
-If you change folders, variables will be migrated to the new folder ***as they are accessed***.  Variables may also be moved manually to the new folder.
-
-#### Log Missing Action Groups
-
+* **Log Missing Action Groups**  
 If checked, any Action Group that doesn't exist will be written to the log.  This is a handy way to get names of additional Action Groups that you may wish to create.
 
-#### Enable Debugging
-
+* **Enable Debugging**  
 If checked, extensive debug information will be written to the log.
+
+* **Delay between Action Groups**  
+Optionally set a delay in seconds between execution of Action Groups.  Default is 0.5 seconds.
 
 ## Usage
 

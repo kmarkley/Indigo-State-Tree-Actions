@@ -35,39 +35,48 @@ class Plugin(indigo.PluginBase):
     ########################################
     def startup(self):
         self.debug = self.pluginPrefs.get("showDebugInfo",False)
-        self.logger.debug(u"startup called")
+        self.logger.debug(u"startup")
         if self.debug:
             self.logger.debug("Debug logging enabled")
         self.folderId = self._getFolderId(self.pluginPrefs.get("folderName",None))
         self.logMissing = self.pluginPrefs.get("logMissing", False)
         self.debug = self.pluginPrefs.get("showDebugInfo",False)
         self.namespaces = self.pluginPrefs.get("namespaces",[])
+        self.actionSleep = float(self.pluginPrefs.get("actionSleep",0))
 
     def shutdown(self):
-        self.logger.debug(u"shutdown called")
+        self.logger.debug(u"shutdown")
 
     def closedPrefsConfigUi(self, valuesDict, userCancelled):
-        self.logger.debug(u"closedPrefsConfigUi called")
+        self.logger.debug(u"closedPrefsConfigUi")
         if not userCancelled:
             self.debug = valuesDict.get("showDebugInfo",False)
             if self.debug:
                 self.logger.debug("Debug logging enabled")
             self.logMissing = valuesDict.get("logMissing",False)
             self.folderId = self._getFolderId(valuesDict.get("folderName",None))
+            self.actionSleep = float(valuesDict.get("actionSleep",0))
 
     def validatePrefsConfigUi(self, valuesDict):
-        self.logger.debug(u"callback 'validatePrefsConfigUi'")
+        self.logger.debug(u"validatePrefsConfigUi")
         errorsDict = indigo.Dict()
         
-        if not all(x.isalnum() or x.isspace() for x in valuesDict["folderName"]):
+        if not all(x.isalnum() or x.isspace() for x in valuesDict.get("folderName")):
             errorsDict["folderName"] = "Folder Name may only contain letters, numbers, and spaces"
+        
+        try:
+            n = float(valuesDict.get("actionSleep"))
+            if not ( 0.0 <= n <= 5.0 ):
+                raise ValueError('actionSleep out of range')
+        except:
+            errorsDict["actionSleep"] = "Must be a number between 0 and 5"
         
         if len(errorsDict) > 0:
             return (False, valuesDict, errorsDict)
         return (True, valuesDict)
     
     def validateActionConfigUi(self, valuesDict, typeId, devId, runtime=False):
-        self.logger.debug(u"callback 'validateActionConfigUi': " + typeId)
+        self.logger.debug(u"validateActionConfigUi: " + typeId)
         errorsDict = indigo.Dict()
         
         if valuesDict.get("baseName",u'') == u'':
@@ -109,7 +118,7 @@ class Plugin(indigo.PluginBase):
     def enterNewState(self, action):
         baseName = action.props.get("baseName")
         newState = action.props.get("stateName")
-        self.logger.debug(u"action 'enterNewState': "+baseName+u"|"+newState)
+        self.logger.debug(u"enterNewState: "+baseName+u"|"+newState)
         valid = self.validateActionConfigUi(action.props, "newState", action.deviceId, runtime=True)
         if not valid[0]:
             self.logger.error(u"Action 'Variable To State' failed validation")
@@ -121,7 +130,7 @@ class Plugin(indigo.PluginBase):
     def variableToState (self, action):
         baseName = action.props.get("baseName")
         stateVarId = action.props.get("stateVarId")
-        self.logger.debug(u"action 'variableToState': "+baseName+u" ["+stateVarId+u"]")
+        self.logger.debug(u"variableToState: "+baseName+u" ["+stateVarId+u"]")
         valid = self.validateActionConfigUi(action.props, "variableToState", action.deviceId, runtime=True)
         if not valid[0]:
             self.logger.error(u"Action 'Variable To State' failed validation")
@@ -133,7 +142,7 @@ class Plugin(indigo.PluginBase):
     def addContext(self, action):
         baseName = action.props.get("baseName")
         context  = action.props.get("contextName")
-        self.logger.debug(u"action 'addContext': "+baseName+u"+"+context)
+        self.logger.debug(u"addContext: "+baseName+u"+"+context)
         valid = self.validateActionConfigUi(action.props, "addContext", action.deviceId, runtime=True)
         if not valid[0]:
             self.logger.error(u"Action 'Variable To State' failed validation")
@@ -155,7 +164,7 @@ class Plugin(indigo.PluginBase):
     def removeContext(self, action):
         baseName = action.props.get("baseName")
         context  = action.props.get("contextName")
-        self.logger.debug(u"action 'removeContext': "+baseName+u"+"+context)
+        self.logger.debug(u"removeContext: "+baseName+u"+"+context)
         valid = self.validateActionConfigUi(action.props, "removeContext", action.deviceId, runtime=True)
         if not valid[0]:
             self.logger.error(u"Action 'Variable To State' failed validation")
@@ -180,12 +189,12 @@ class Plugin(indigo.PluginBase):
     ########################################
     
     def changeNamespace(self, valuesDict="", typeId=""):
-        self.logger.debug(u"menu 'changeNamespace': " + typeId)
+        self.logger.debug(u"changeNamespace: " + typeId)
         errorsDict = indigo.Dict()
         baseName = valuesDict.get("baseName")
-        if valuesDict["baseName"] == u'':
+        if valuesDict.get("baseName","") == u'':
             errorsDict["baseName"] = "Base Name must be at least one character long"
-        elif any(ch in valuesDict["baseName"] for ch in kBaseReserved):
+        elif any(ch in valuesDict.get("baseName") for ch in kBaseReserved):
             errorsDict["baseName"] = "Base Name may not contain:  "+"  ".join(kBaseReserved)
         if typeId == "addNamespace":
             if not baseName in self.namespaces:
@@ -283,7 +292,7 @@ class Plugin(indigo.PluginBase):
 
     
     def _doStateChange(self, baseName, newState):
-        self.logger.debug(u"utility '_doStateChange': "+baseName+u"|"+newState)
+        self.logger.debug(u"_doStateChange: "+baseName+u"|"+newState)
         baseObj  = self.baseState(self, baseName)
         if newState != baseObj.value:
             oldTree  = self.stateTree(self, baseObj, baseObj.value)
@@ -309,9 +318,10 @@ class Plugin(indigo.PluginBase):
     
     # Action Groups
     def _execute(self, groupName):
-        self.logger.debug(u"utility '_execute': "+groupName)
+        self.logger.debug(u"_execute: "+groupName)
         try:
             indigo.actionGroup.execute(groupName)
+            self.sleep(self.actionSleep)
         except:
             if self.logMissing:
                 self.logger.info(groupName+u" (missing)")
@@ -332,7 +342,7 @@ class Plugin(indigo.PluginBase):
             return str
         
         fixedName = unicode(varNameFix(name, strip))
-        self.logger.debug(u"utility '_getVariable': "+fixedName)
+        self.logger.debug(u"_getVariable: "+fixedName)
         if force:
             try:
                 var = indigo.variable.create(fixedName, folder=self.folderId)
@@ -351,7 +361,7 @@ class Plugin(indigo.PluginBase):
         return var
     
     def _getFolderId(self, name):
-        self.logger.debug(u"utility '_getFolderId': "+name)
+        self.logger.debug(u"_getFolderId: "+name)
         if name:
             if name not in indigo.variables.folders:
                 folder = indigo.variables.folder.create(name)

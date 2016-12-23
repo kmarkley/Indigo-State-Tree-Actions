@@ -13,6 +13,9 @@
         <Label>Log Missing Action Groups:</Label>
         <Description>Useful to list Action Groups you may wish to create.   </Description>
     </Field>
+    <Field type="textfield" id="actionSleep" defaultValue="0.5">
+        <Label>Delay between Action Groups:</Label>
+    </Field>
     <Field id="spacer2" type="label" fontColor="darkgray" fontSize="small" alignWithControl="true">
         <Label> </Label>
     </Field>
