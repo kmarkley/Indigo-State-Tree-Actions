@@ -116,30 +116,37 @@ The plugin will also create and maintain Variables for every state in the tree. 
 
 After the above state change, the variables will be:
 
-	HouseState_Away				False
-	HouseState_Away_Vacation	False
-	HouseState_Away_Work		False
-	HouseState_Home				True
-	HouseState_Home_Sleep		False
-	HouseState_Home_Wake		True
+	HouseState_Away					False
+	HouseState_Away_Vacation		False
+	HouseState_Away_Work			False
+	HouseState_Home					True
+	HouseState_Home_Sleep			False
+	HouseState_Home_Wake			True
 
 This makes it very easy to refer any state in Conditions for Schedules and Triggers.
 
-#### Other Variables
+#### Context Variables
 
-The plugin maintains a few other Variables as well.
+There is a variable to store currect contexts as a list _(note the double-underscore)_:
+
+	HouseState__Context				[u'Rain',u'Guests']
+
+As well a variable for the boolean state of each context:
+
+	HouseState__Context__Dark		False
+	HouseState__Context__Rain		True
+	HouseState__Context__Guests		True
+
+
+#### Other Variables
 
 A variable with the same name a the Base Name always holds the current state:
 
-	HouseState					Home>Wake
-
-There is a variable to store contexts _(note the double-underscore)_:
-
-	HouseState__Context			[u'Dark',u'Rain']
+	HouseState						Home>Wake
 
 And another for a time stamp _(note the double-underscore)_:
 
-	HouseState__LastChange		2016-12-17 20:44:04.313000
+	HouseState__LastChange			2016-12-17 20:44:04.313000
 
 ---
 

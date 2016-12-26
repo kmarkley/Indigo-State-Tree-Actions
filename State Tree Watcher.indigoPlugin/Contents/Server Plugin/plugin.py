@@ -22,6 +22,7 @@ kBaseReserved   = (kBaseChar,kStateChar,kContextChar,kExitChar,kVarSepChar)
 kStateReserved  = (kBaseChar,kContextChar,kExitChar,kVarSepChar)
 kChangedSuffix  = u"__LastChange"
 kContextSuffix  = u"__Context"
+kContextExtra   = u"__"
 
 ################################################################################
 class Plugin(indigo.PluginBase):
@@ -145,7 +146,7 @@ class Plugin(indigo.PluginBase):
         self.logger.debug(u"addContext: "+baseName+u"+"+context)
         valid = self.validateActionConfigUi(action.props, "addContext", action.deviceId, runtime=True)
         if not valid[0]:
-            self.logger.error(u"Action 'Variable To State' failed validation")
+            self.logger.error(u"Action 'Add Context' failed validation")
             for key in valid[2]:
                 self.logger.error(unicode(valid[2][key]))
             return
@@ -158,8 +159,7 @@ class Plugin(indigo.PluginBase):
             for item in oldTree.states:
                 self._execute(item.enterAction+kContextChar+context)
             # save the new context list
-            baseObj.contexts.append(context)
-            self._setValue(baseObj.contextVar, baseObj.contexts)
+            baseObj.addContext(context)
     
     def removeContext(self, action):
         baseName = action.props.get("baseName")
@@ -167,7 +167,7 @@ class Plugin(indigo.PluginBase):
         self.logger.debug(u"removeContext: "+baseName+u"+"+context)
         valid = self.validateActionConfigUi(action.props, "removeContext", action.deviceId, runtime=True)
         if not valid[0]:
-            self.logger.error(u"Action 'Variable To State' failed validation")
+            self.logger.error(u"Action 'Remove Context' failed validation")
             for key in valid[2]:
                 self.logger.error(unicode(valid[2][key]))
             return
@@ -180,8 +180,7 @@ class Plugin(indigo.PluginBase):
             # execute global context action group
             self._execute(baseObj.enterAction+kContextChar+context+kExitChar)
             # save the new context list
-            baseObj.contexts.remove(context)
-            self._setValue(baseObj.contextVar, baseObj.contexts)
+            baseObj.removeContext(context)
         
     
     ########################################
@@ -244,6 +243,21 @@ class Plugin(indigo.PluginBase):
     
         def exit(self):
             self.pluginObj._execute(self.exitAction)
+        
+        def addContext(self, context):
+            if not (context in self.contexts):
+                self.contexts.append(context)
+                self.pluginObj._setValue(self.contextVar, self.contexts)
+                var = self.pluginObj._getVariable(self.contextVar.name+kContextExtra+context, strip=False)
+                self.pluginObj._setValue(var, True)
+        
+        def removeContext(self, context):
+            if (context in self.contexts):
+                self.contexts.remove(context)
+                self.pluginObj._setValue(self.contextVar, self.contexts)
+                var = self.pluginObj._getVariable(self.contextVar.name+kContextExtra+context, strip=False)
+                self.pluginObj._setValue(var, False)
+        
 
     # a single state within the hierarchy
     class singleState(object):
