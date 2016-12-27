@@ -271,18 +271,18 @@ class Plugin(indigo.PluginBase):
             self.baseObj        = baseObj
         
         def enter(self):
-            self.pluginObj._setValue(self.var, True)
             self.pluginObj._execute(self.enterAction)
             if self.baseObj.contexts:
                 for context in self.baseObj.contexts:
                     self.pluginObj._execute(self.enterAction+kContextChar+context)
+            self.pluginObj._setValue(self.var, True)
     
         def exit(self):
-            self.pluginObj._setValue(self.var, False)
             if self.baseObj.contexts:
                 for context in self.baseObj.contexts:
                     self.pluginObj._execute(self.enterAction+kContextChar+context+kExitChar)
             self.pluginObj._execute(self.exitAction)
+            self.pluginObj._setValue(self.var, False)
 
 
     # a full list of nested states
