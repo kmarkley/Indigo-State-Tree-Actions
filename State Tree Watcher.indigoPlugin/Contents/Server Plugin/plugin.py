@@ -33,7 +33,6 @@ class Plugin(indigo.PluginBase):
     def __del__(self):
         indigo.PluginBase.__del__(self)
 
-    ########################################
     def startup(self):
         self.debug = self.pluginPrefs.get("showDebugInfo",False)
         self.logger.debug(u"startup")
@@ -47,6 +46,11 @@ class Plugin(indigo.PluginBase):
 
     def shutdown(self):
         self.logger.debug(u"shutdown")
+    
+    
+    ########################################
+    # Config and Validate
+    ########################################
 
     def closedPrefsConfigUi(self, valuesDict, userCancelled):
         self.logger.debug(u"closedPrefsConfigUi")
@@ -84,8 +88,8 @@ class Plugin(indigo.PluginBase):
             errorsDict["baseName"] = u"Base Name must be at least one character long"
         elif any(ch in valuesDict.get("baseName",u'') for ch in kBaseReserved):
             errorsDict["baseName"] = u"Base Name may not contain:  "+"  ".join(kBaseReserved)
-        elif valuesDict.get("baseName",u'') not in self.namespaces:
-            errorsDict["baseName"] = u"Base Name does not exist"
+        elif runtime and valuesDict.get("baseName",u'') not in self.namespaces:
+            errorsDict["baseName"] = u"Namespace '%s' does not exist" % valuesDict.get("baseName")
             
         if typeId == "enterNewState":
             if valuesDict.get("stateName",u'') == u'':
@@ -112,6 +116,15 @@ class Plugin(indigo.PluginBase):
             return (False, valuesDict, errorsDict)
         return (True, valuesDict)
 
+    def _validateRuntime(self, action, typeId):
+        valid = self.validateActionConfigUi(action.props, typeId, action.deviceId, runtime=True)
+        if not valid[0]:
+            self.logger.error(u"Action '%s' failed validation"%typeId)
+            for key in valid[2]:
+                self.logger.error(unicode(valid[2][key]))
+        return valid[0]
+    
+    
     ########################################
     # Action Methods
     ########################################
@@ -120,69 +133,74 @@ class Plugin(indigo.PluginBase):
         baseName = action.props.get("baseName")
         newState = action.props.get("stateName")
         self.logger.debug(u"enterNewState: "+baseName+u"|"+newState)
-        valid = self.validateActionConfigUi(action.props, "newState", action.deviceId, runtime=True)
-        if not valid[0]:
-            self.logger.error(u"Action 'Variable To State' failed validation")
-            for key in valid[2]:
-                self.logger.error(unicode(valid[2][key]))
-            return
-        self._doStateChange(baseName, newState)
+        if self._validateRuntime(action, "enterNewState"):
+            self._doStateChange(baseName, newState)
         
     def variableToState (self, action):
         baseName = action.props.get("baseName")
         stateVarId = action.props.get("stateVarId")
         self.logger.debug(u"variableToState: "+baseName+u" ["+stateVarId+u"]")
-        valid = self.validateActionConfigUi(action.props, "variableToState", action.deviceId, runtime=True)
-        if not valid[0]:
-            self.logger.error(u"Action 'Variable To State' failed validation")
-            for key in valid[2]:
-                self.logger.error(unicode(valid[2][key]))
-            return
-        self._doStateChange(baseName, indigo.variables[int(stateVarId)].value)
+        if self._validateRuntime(action, "variableToState"):
+            self._doStateChange(baseName, indigo.variables[int(stateVarId)].value)
     
     def addContext(self, action):
         baseName = action.props.get("baseName")
         context  = action.props.get("contextName")
-        self.logger.debug(u"addContext: "+baseName+u"+"+context)
-        valid = self.validateActionConfigUi(action.props, "addContext", action.deviceId, runtime=True)
-        if not valid[0]:
-            self.logger.error(u"Action 'Add Context' failed validation")
-            for key in valid[2]:
-                self.logger.error(unicode(valid[2][key]))
-            return
-        baseObj  = self.baseState(self, baseName)
-        if not (context in baseObj.contexts):
-            oldTree  = self.stateTree(self, baseObj, baseObj.value)
-            # execute global context action group
-            self._execute(baseObj.enterAction+kContextChar+context)
-            # execute context action group for each nested state
-            for item in oldTree.states:
-                self._execute(item.enterAction+kContextChar+context)
-            # save the new context list
-            baseObj.addContext(context)
+        self.logger.debug(u"addContext: "+baseName+kContextChar+context)
+        if self._validateRuntime(action, "addContext"):
+            baseObj  = self.baseState(self, baseName)
+            if not (context in baseObj.contexts):
+                oldTree  = self.stateTree(self, baseObj, baseObj.value)
+                # execute global context action group
+                baseObj.enterContext(context)
+                # execute context action group for each nested state
+                for item in oldTree.states:
+                    item.enterContext(context)
+                # save the new context list
+                baseObj.addContext(context)
     
     def removeContext(self, action):
         baseName = action.props.get("baseName")
         context  = action.props.get("contextName")
-        self.logger.debug(u"removeContext: "+baseName+u"+"+context)
-        valid = self.validateActionConfigUi(action.props, "removeContext", action.deviceId, runtime=True)
-        if not valid[0]:
-            self.logger.error(u"Action 'Remove Context' failed validation")
-            for key in valid[2]:
-                self.logger.error(unicode(valid[2][key]))
-            return
-        baseObj  = self.baseState(self, baseName)
-        if (context in baseObj.contexts):
-            oldTree  = self.stateTree(self, baseObj, baseObj.value)
-            # execute context action group for each nested state (reverse order)
-            for item in oldTree.states[::-1]:
-                self._execute(item.enterAction+kContextChar+context+kExitChar)
-            # execute global context action group
-            self._execute(baseObj.enterAction+kContextChar+context+kExitChar)
-            # save the new context list
-            baseObj.removeContext(context)
+        self.logger.debug(u"removeContext: "+baseName+kContextChar+context)
+        if self._validateRuntime(action, "removeContext"):
+            baseObj  = self.baseState(self, baseName)
+            if (context in baseObj.contexts):
+                oldTree  = self.stateTree(self, baseObj, baseObj.value)
+                # execute context action group for each nested state (reverse order)
+                for item in oldTree.states[::-1]:
+                    item.exitContext(context)
+                # execute global context action group
+                baseObj.exitContext(context)
+                # save the new context list
+                baseObj.removeContext(context)
         
+    def _doStateChange(self, baseName, newState):
+        baseObj  = self.baseState(self, baseName)
+        self.logger.debug(u"_doStateChange: "+baseName+kBaseChar+newState)
+        if newState != baseObj.value:
+            oldTree  = self.stateTree(self, baseObj, baseObj.value)
+            newTree  = self.stateTree(self, baseObj, newState)
+            # execute global enter action group
+            baseObj.enter()
+            # back out old tree until it matches new tree
+            matchList = list(item.name for item in newTree.states)
+            for i, item in reversed(list(enumerate(oldTree.states))):
+                if item.name in matchList:
+                    i += 1
+                    break
+                item.exit()
+            else: i = 0   # if oldTree is empty, i won't initialize
+            # enter new tree from matching point
+            for item in newTree.states[i:]:
+                item.enter()
+            # save new state and timestamp to variables
+            self._setValue(baseObj.var, newState)
+            self._setValue(baseObj.changedVar, indigo.server.getTime())
+            # execute global exit action group
+            baseObj.exit()
     
+   
     ########################################
     # Menu Methods
     ########################################
@@ -199,7 +217,7 @@ class Plugin(indigo.PluginBase):
             if not baseName in self.namespaces:
                 self.namespaces.append(baseName)
             else:
-                errorsDict["baseName"] = "Base Name already exist"
+                errorsDict["baseName"] = "Base Name already exists"
         elif typeId == "removeNamespace":
             if  baseName in self.namespaces:
                 self.namespaces.remove(baseName)
@@ -224,14 +242,13 @@ class Plugin(indigo.PluginBase):
     # defines the namespace for hierarchical state trees
     class baseState(object):
         def __init__(self, pluginObj, baseName):
-            pluginObj.logger.debug(u"class 'baseState': "+baseName)
+            pluginObj.logger.debug(u"baseState: "+baseName)
             self.name           = baseName
             self.var            = pluginObj._getVariable(self.name)
             self.value          = self.var.value
             self.changedVar     = pluginObj._getVariable(self.name + kChangedSuffix, strip=False)
             self.contextVar     = pluginObj._getVariable(self.name + kContextSuffix, strip=False)
-            self.enterAction    = self.name
-            self.exitAction     = self.name+kExitChar
+            self.actionName     = self.name
             try:
                 self.contexts = eval(self.contextVar.value)
             except:
@@ -239,10 +256,16 @@ class Plugin(indigo.PluginBase):
             self.pluginObj      = pluginObj
         
         def enter(self):
-            self.pluginObj._execute(self.enterAction)
+            self.pluginObj._execute(self.actionName)
     
         def exit(self):
-            self.pluginObj._execute(self.exitAction)
+            self.pluginObj._execute(self.actionName+kExitChar)
+        
+        def enterContext(self, context):
+            self.pluginObj._execute(self.actionName+kContextChar+context)
+    
+        def exitContext(self, context):
+            self.pluginObj._execute(self.actionName+kContextChar+context+kExitChar)
         
         def addContext(self, context):
             if not (context in self.contexts):
@@ -258,37 +281,40 @@ class Plugin(indigo.PluginBase):
                 var = self.pluginObj._getVariable(self.contextVar.name+kContextExtra+context, strip=False)
                 self.pluginObj._setValue(var, False)
         
-
+        
     # a single state within the hierarchy
     class singleState(object):
         def __init__(self, pluginObj, baseObj, stateName):
-            pluginObj.logger.debug(u"class 'singleState': "+stateName)
+            pluginObj.logger.debug(u"singleState: "+stateName)
             self.name           = stateName
             self.var            = pluginObj._getVariable(baseObj.name+kBaseChar+stateName)
-            self.enterAction    = baseObj.name+kBaseChar+stateName
-            self.exitAction     = baseObj.name+kBaseChar+stateName+kExitChar
+            self.actionName     = baseObj.name+kBaseChar+stateName
             self.pluginObj      = pluginObj
             self.baseObj        = baseObj
         
         def enter(self):
-            self.pluginObj._execute(self.enterAction)
-            if self.baseObj.contexts:
-                for context in self.baseObj.contexts:
-                    self.pluginObj._execute(self.enterAction+kContextChar+context)
+            self.pluginObj._execute(self.actionName)
+            for context in self.baseObj.contexts:
+                self.enterContext(context)
             self.pluginObj._setValue(self.var, True)
     
         def exit(self):
-            if self.baseObj.contexts:
-                for context in self.baseObj.contexts:
-                    self.pluginObj._execute(self.enterAction+kContextChar+context+kExitChar)
-            self.pluginObj._execute(self.exitAction)
+            for context in self.baseObj.contexts:
+                self.exitContext(context)
+            self.pluginObj._execute(self.actionName+kExitChar)
             self.pluginObj._setValue(self.var, False)
+        
+        def enterContext(self, context):
+            self.pluginObj._execute(self.actionName+kContextChar+context)
+
+        def exitContext(self, context):
+            self.pluginObj._execute(self.actionName+kContextChar+context+kExitChar)
 
 
     # a full list of nested states
     class stateTree(object):
         def __init__(self, pluginObj, baseObj, stateName):
-            pluginObj.logger.debug(u"class 'stateTree': "+stateName)
+            pluginObj.logger.debug(u"stateTree: "+stateName)
             self.states = []
             if stateName != u'':
                 branches    = stateName.split(kStateChar)
@@ -305,31 +331,6 @@ class Plugin(indigo.PluginBase):
     ########################################
 
     
-    def _doStateChange(self, baseName, newState):
-        self.logger.debug(u"_doStateChange: "+baseName+u"|"+newState)
-        baseObj  = self.baseState(self, baseName)
-        if newState != baseObj.value:
-            oldTree  = self.stateTree(self, baseObj, baseObj.value)
-            newTree  = self.stateTree(self, baseObj, newState)
-            # save new state and timestamp to variables
-            self._setValue(baseObj.var, newState)
-            self._setValue(baseObj.changedVar, indigo.server.getTime())
-            # execute global enter action group
-            baseObj.enter()
-            # back out old tree until it matches new tree
-            matchList = list(item.name for item in newTree.states)
-            for i, item in reversed(list(enumerate(oldTree.states))):
-                if item.name in matchList:
-                    i += 1
-                    break
-                item.exit()
-            else: i = 0   # if oldTree is empty, i won't initialize
-            # enter new tree from matching point
-            for item in newTree.states[i:]:
-                item.enter()
-            # execute global exit action group
-            baseObj.exit()
-    
     # Action Groups
     def _execute(self, groupName):
         self.logger.debug(u"_execute: "+groupName)
@@ -342,6 +343,7 @@ class Plugin(indigo.PluginBase):
 
     # Variables
     def _setValue(self, var, value):
+        # just tired of typing unicode()
         indigo.variable.updateValue(var.id, unicode(value))
     
     def _getVariable(self, name, force=True, strip=True):
