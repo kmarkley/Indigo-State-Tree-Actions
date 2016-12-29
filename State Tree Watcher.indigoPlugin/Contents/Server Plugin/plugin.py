@@ -74,7 +74,7 @@ class Plugin(indigo.PluginBase):
             if not ( 0.0 <= n <= 5.0 ):
                 raise ValueError('actionSleep out of range')
         except:
-            errorsDict["actionSleep"] = "Must be a number between 0 and 5"
+            errorsDict["actionSleep"] = "Must be a number between 0.0 and 5.0"
         
         if len(errorsDict) > 0:
             return (False, valuesDict, errorsDict)
@@ -96,11 +96,13 @@ class Plugin(indigo.PluginBase):
                 errorsDict["stateName"] = u"State Name must be at least one character long"
             elif any(ch in valuesDict.get("stateName",u'') for ch in kStateReserved):
                 errorsDict["stateName"] = u"State Name may not contain:  "+"  ".join(kStateReserved)
+        
         elif typeId in ("addContext","removeContext"):
             if valuesDict.get("contextName",u'') == u'':
                 errorsDict["contextName"] = u"Context must be at least one character long"
             elif any(ch in valuesDict.get("contextName",u'') for ch in kBaseReserved):
                 errorsDict["contextName"] = u"Context may not contain:  "+"  ".join(kBaseReserved)
+        
         elif typeId == "variableToState":
             if valuesDict.get("stateVarId",u'') == u'':
                 self.logger.error("No variable defined")
@@ -125,82 +127,6 @@ class Plugin(indigo.PluginBase):
         return valid[0]
     
     
-    ########################################
-    # Action Methods
-    ########################################
-    
-    def enterNewState(self, action):
-        baseName = action.props.get("baseName")
-        newState = action.props.get("stateName")
-        self.logger.debug(u"enterNewState: "+baseName+u"|"+newState)
-        if self._validateRuntime(action, "enterNewState"):
-            self._doStateChange(baseName, newState)
-        
-    def variableToState (self, action):
-        baseName = action.props.get("baseName")
-        stateVarId = action.props.get("stateVarId")
-        self.logger.debug(u"variableToState: "+baseName+u" ["+stateVarId+u"]")
-        if self._validateRuntime(action, "variableToState"):
-            self._doStateChange(baseName, indigo.variables[int(stateVarId)].value)
-    
-    def addContext(self, action):
-        baseName = action.props.get("baseName")
-        context  = action.props.get("contextName")
-        self.logger.debug(u"addContext: "+baseName+kContextChar+context)
-        if self._validateRuntime(action, "addContext"):
-            baseObj  = self.baseState(self, baseName)
-            if not (context in baseObj.contexts):
-                oldTree  = self.stateTree(self, baseObj, baseObj.value)
-                # execute global context action group
-                baseObj.enterContext(context)
-                # execute context action group for each nested state
-                for item in oldTree.states:
-                    item.enterContext(context)
-                # save the new context list
-                baseObj.addContext(context)
-    
-    def removeContext(self, action):
-        baseName = action.props.get("baseName")
-        context  = action.props.get("contextName")
-        self.logger.debug(u"removeContext: "+baseName+kContextChar+context)
-        if self._validateRuntime(action, "removeContext"):
-            baseObj  = self.baseState(self, baseName)
-            if (context in baseObj.contexts):
-                oldTree  = self.stateTree(self, baseObj, baseObj.value)
-                # execute context action group for each nested state (reverse order)
-                for item in oldTree.states[::-1]:
-                    item.exitContext(context)
-                # execute global context action group
-                baseObj.exitContext(context)
-                # save the new context list
-                baseObj.removeContext(context)
-        
-    def _doStateChange(self, baseName, newState):
-        baseObj  = self.baseState(self, baseName)
-        self.logger.debug(u"_doStateChange: "+baseName+kBaseChar+newState)
-        if newState != baseObj.value:
-            oldTree  = self.stateTree(self, baseObj, baseObj.value)
-            newTree  = self.stateTree(self, baseObj, newState)
-            # execute global enter action group
-            baseObj.enter()
-            # back out old tree until it matches new tree
-            matchList = list(item.name for item in newTree.states)
-            for i, item in reversed(list(enumerate(oldTree.states))):
-                if item.name in matchList:
-                    i += 1
-                    break
-                item.exit()
-            else: i = 0   # if oldTree is empty, i won't initialize
-            # enter new tree from matching point
-            for item in newTree.states[i:]:
-                item.enter()
-            # save new state and timestamp to variables
-            self._setValue(baseObj.var, newState)
-            self._setValue(baseObj.changedVar, indigo.server.getTime())
-            # execute global exit action group
-            baseObj.exit()
-    
-   
     ########################################
     # Menu Methods
     ########################################
@@ -236,6 +162,76 @@ class Plugin(indigo.PluginBase):
     
     
     ########################################
+    # Action Methods
+    ########################################
+    
+    def enterNewState(self, action):
+        self.logger.debug(u"enterNewState")
+        if self._validateRuntime(action, "enterNewState"):
+            self._doStateChange(action)
+        
+    def variableToState (self, action):
+        self.logger.debug(u"variableToState: "+indigo.variables[int(action.stateVarId)].name)
+        if self._validateRuntime(action, "variableToState"):
+            action.props["stateName"] = indigo.variables[int(action.stateVarId)].value
+            self._doStateChange(action)
+    
+    def _doStateChange(self, action):
+        baseName = action.props.get("baseName")
+        newState = action.props.get("stateName")
+        baseObj  = self.baseState(self, baseName)
+        self.logger.debug(u"_doStateChange: "+baseName+kBaseChar+newState)
+        if newState != baseObj.value:
+            oldTree  = self.stateTree(self, baseObj, baseObj.value)
+            newTree  = self.stateTree(self, baseObj, newState)
+            # execute global enter action group
+            baseObj.stateAction(True)
+            # back out old tree until it matches new tree
+            matchList = list(item.name for item in newTree.states)
+            for i, item in reversed(list(enumerate(oldTree.states))):
+                if item.name in matchList:
+                    i += 1
+                    break
+                item.stateAction(False)
+            else: i = 0   # if oldTree is empty, i won't initialize
+            # enter new tree from matching point
+            for item in newTree.states[i:]:
+                item.stateAction(True)
+            # save new state and timestamp to variables
+            self._setValue(baseObj.var, newState)
+            self._setValue(baseObj.changedVar, indigo.server.getTime())
+            # execute global exit action group
+            baseObj.stateAction(False)
+    
+    def addContext(self, action):
+        self.logger.debug(u"addContext")
+        if self._validateRuntime(action, "addContext"):
+            self._doContextChange(action, True)
+    
+    def removeContext(self, action):
+        self.logger.debug(u"removeContext")
+        if self._validateRuntime(action, "removeContext"):
+            self._doContextChange(action, False)
+        
+    def _doContextChange(self, action, addFlag):
+        baseName = action.props.get("baseName")
+        context  = action.props.get("contextName")
+        self.logger.debug(u"_doContextChange: "+baseName+kContextChar+context+[kExitChar,''][int(addFlag)])
+        baseObj  = self.baseState(self, baseName)
+        if baseObj.updateContexts(context, addFlag):
+            oldTree  = self.stateTree(self, baseObj, baseObj.value)
+            # execute global add context action group
+            if addFlag: baseObj.changeContext(context, True)
+            # execute context action group for each nested state
+            incr = [-1,1][int(addFlag)]
+            for item in oldTree.states[::incr]:
+                item.changeContext(context, addFlag)
+            # execute global remove context action group
+            if not addFlag: baseObj.changeContext(context, False)
+            baseObj.saveContext(context, addFlag)
+        
+   
+    ########################################
     # Classes
     ########################################
     
@@ -246,8 +242,8 @@ class Plugin(indigo.PluginBase):
             self.name           = baseName
             self.var            = pluginObj._getVariable(self.name)
             self.value          = self.var.value
-            self.changedVar     = pluginObj._getVariable(self.name + kChangedSuffix, strip=False)
-            self.contextVar     = pluginObj._getVariable(self.name + kContextSuffix, strip=False)
+            self.changedVar     = pluginObj._getVariable(self.name+kChangedSuffix, strip=False)
+            self.contextVar     = pluginObj._getVariable(self.name+kContextSuffix, strip=False)
             self.actionName     = self.name
             try:
                 self.contexts = eval(self.contextVar.value)
@@ -255,31 +251,25 @@ class Plugin(indigo.PluginBase):
                 self.contexts = []
             self.pluginObj      = pluginObj
         
-        def enter(self):
-            self.pluginObj._execute(self.actionName)
-    
-        def exit(self):
-            self.pluginObj._execute(self.actionName+kExitChar)
+        def stateAction(self, enterFlag):
+            self.pluginObj._execute(self.actionName+[kExitChar,''][int(enterFlag)])
         
-        def enterContext(self, context):
-            self.pluginObj._execute(self.actionName+kContextChar+context)
-    
-        def exitContext(self, context):
-            self.pluginObj._execute(self.actionName+kContextChar+context+kExitChar)
+        def changeContext(self, context, addFlag):
+            self.pluginObj._execute(self.actionName+kContextChar+context+[kExitChar,''][int(addFlag)])
         
-        def addContext(self, context):
-            if not (context in self.contexts):
+        def updateContexts(self, context, addFlag):
+            if (addFlag) and (context not in self.contexts):
                 self.contexts.append(context)
-                self.pluginObj._setValue(self.contextVar, self.contexts)
-                var = self.pluginObj._getVariable(self.contextVar.name+kContextExtra+context, strip=False)
-                self.pluginObj._setValue(var, True)
-        
-        def removeContext(self, context):
-            if (context in self.contexts):
+            elif (not addFlag) and (context in self.contexts):
                 self.contexts.remove(context)
-                self.pluginObj._setValue(self.contextVar, self.contexts)
-                var = self.pluginObj._getVariable(self.contextVar.name+kContextExtra+context, strip=False)
-                self.pluginObj._setValue(var, False)
+            else:
+                return False
+            self.pluginObj._setValue(self.contextVar, self.contexts)
+            return True
+        
+        def saveContext(self, context, addFlag):
+            var = self.pluginObj._getVariable(self.contextVar.name+kContextExtra+context, strip=False)
+            self.pluginObj._setValue(var, addFlag)
         
         
     # a single state within the hierarchy
@@ -287,28 +277,20 @@ class Plugin(indigo.PluginBase):
         def __init__(self, pluginObj, baseObj, stateName):
             pluginObj.logger.debug(u"singleState: "+stateName)
             self.name           = stateName
-            self.var            = pluginObj._getVariable(baseObj.name+kBaseChar+stateName)
             self.actionName     = baseObj.name+kBaseChar+stateName
+            self.var            = pluginObj._getVariable(self.actionName)
             self.pluginObj      = pluginObj
             self.baseObj        = baseObj
         
-        def enter(self):
-            self.pluginObj._execute(self.actionName)
+        def stateAction(self, enterFlag):
+            if enterFlag: self.pluginObj._execute(self.actionName)
             for context in self.baseObj.contexts:
-                self.enterContext(context)
-            self.pluginObj._setValue(self.var, True)
+                self.changeContext(context, enterFlag)
+            if not enterFlag: self.pluginObj._execute(self.actionName+kExitChar)
+            self.pluginObj._setValue(self.var, enterFlag)
     
-        def exit(self):
-            for context in self.baseObj.contexts:
-                self.exitContext(context)
-            self.pluginObj._execute(self.actionName+kExitChar)
-            self.pluginObj._setValue(self.var, False)
-        
-        def enterContext(self, context):
-            self.pluginObj._execute(self.actionName+kContextChar+context)
-
-        def exitContext(self, context):
-            self.pluginObj._execute(self.actionName+kContextChar+context+kExitChar)
+        def changeContext(self, context, addFlag):
+            self.pluginObj._execute(self.actionName+kContextChar+context+[kExitChar,''][int(addFlag)])
 
 
     # a full list of nested states
@@ -346,7 +328,7 @@ class Plugin(indigo.PluginBase):
         # just tired of typing unicode()
         indigo.variable.updateValue(var.id, unicode(value))
     
-    def _getVariable(self, name, force=True, strip=True):
+    def _getVariable(self, name, strip=True):
         def trans(c):
             if c.isalnum():
                 return c
@@ -359,19 +341,13 @@ class Plugin(indigo.PluginBase):
         
         fixedName = unicode(varNameFix(name, strip))
         self.logger.debug(u"_getVariable: "+fixedName)
-        if force:
-            try:
-                var = indigo.variable.create(fixedName, folder=self.folderId)
-            except ValueError, e:
-                if e.message == "NameNotUniqueError":
-                    var = indigo.variables[fixedName]
-                else:
-                    self.logger.error("Variable error: %s" % (str(e)))
-        else:
-            try:
+        try:
+            var = indigo.variable.create(fixedName, folder=self.folderId)
+        except ValueError, e:
+            if e.message == "NameNotUniqueError":
                 var = indigo.variables[fixedName]
-            except:
-                var = None
+            else:
+                self.logger.error("Variable error: %s" % (str(e)))
         if var and (var.folderId != self.folderId):
             indigo.variable.moveToFolder(var, value=self.folderId)
         return var
