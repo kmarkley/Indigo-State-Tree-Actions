@@ -216,14 +216,14 @@ class Plugin(indigo.PluginBase):
     def _doContextChange(self, action, addFlag):
         baseName = action.props.get("baseName")
         context  = action.props.get("contextName")
-        self.logger.debug(u"_doContextChange: "+baseName+kContextChar+context+[kExitChar,''][int(addFlag)])
+        self.logger.debug(u"_doContextChange: "+baseName+kContextChar+context+[kExitChar,''][addFlag])
         baseObj  = self.baseState(self, baseName)
         if baseObj.updateContexts(context, addFlag):
             oldTree  = self.stateTree(self, baseObj, baseObj.value)
             # execute global add context action group
             if addFlag: baseObj.changeContext(context, True)
             # execute context action group for each nested state
-            incr = [-1,1][int(addFlag)]
+            incr = [-1,1][addFlag]
             for item in oldTree.states[::incr]:
                 item.changeContext(context, addFlag)
             # execute global remove context action group
@@ -252,10 +252,10 @@ class Plugin(indigo.PluginBase):
             self.pluginObj      = pluginObj
         
         def stateAction(self, enterFlag):
-            self.pluginObj._execute(self.actionName+[kExitChar,''][int(enterFlag)])
+            self.pluginObj._execute(self.actionName+[kExitChar,''][enterFlag])
         
         def changeContext(self, context, addFlag):
-            self.pluginObj._execute(self.actionName+kContextChar+context+[kExitChar,''][int(addFlag)])
+            self.pluginObj._execute(self.actionName+kContextChar+context+[kExitChar,''][addFlag])
         
         def updateContexts(self, context, addFlag):
             if (addFlag) and (context not in self.contexts):
@@ -290,7 +290,7 @@ class Plugin(indigo.PluginBase):
             self.pluginObj._setValue(self.var, enterFlag)
     
         def changeContext(self, context, addFlag):
-            self.pluginObj._execute(self.actionName+kContextChar+context+[kExitChar,''][int(addFlag)])
+            self.pluginObj._execute(self.actionName+kContextChar+context+[kExitChar,''][addFlag])
 
 
     # a full list of nested states
