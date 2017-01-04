@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<PluginConfig>	
+    <Field type="textfield" id="folderName" defaultValue="State Tree Watcher">
+        <Label>Folder for Variables:</Label>
+    </Field>
+    <Field id="folderLabel" type="label" fontColor="darkgray" fontSize="small" alignWithControl="true">
+        <Label>Variables will be moved to new folder as the are accessed.  Leave blank for no folder.</Label>
+    </Field>
+    <Field id="spacer1" type="label" fontColor="darkgray" fontSize="small" alignWithControl="true">
+        <Label> </Label>
+    </Field>
+    <Field type="checkbox" id="logMissing" defaultValue="false">
+        <Label>Log Missing Action Groups:</Label>
+        <Description>Useful to list Action Groups you may wish to create.   </Description>
+    </Field>
+    <Field type="textfield" id="actionSleep" defaultValue="0.5">
+        <Label>Delay between Action Groups:</Label>
+    </Field>
+    <Field id="spacer2" type="label" fontColor="darkgray" fontSize="small" alignWithControl="true">
+        <Label> </Label>
+    </Field>
+    <Field id="separator1" type="separator"/>
+	<Field id="showDebugInfo" type="checkbox">
+		<Label>Enable debuging:</Label>
+		<Description>(not recommended)</Description>
+	</Field>
+</PluginConfig>

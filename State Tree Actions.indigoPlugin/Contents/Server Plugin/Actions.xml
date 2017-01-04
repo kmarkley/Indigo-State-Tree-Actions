@@ -1,0 +1,59 @@
+<?xml version="1.0"?>
+<Actions>
+	<Action id="enterNewState">
+		<Name>Enter New State</Name>
+		<CallbackMethod>enterNewState</CallbackMethod>
+		<ConfigUI>
+			<Field id="baseName" type="menu">
+				<Label>Base Name:</Label>
+                <List class="self" method="listNamespaces"/>
+			</Field>
+			<Field id="stateName" type="textfield">
+				<Label>New State:</Label>
+			</Field>
+			<Field id="enterNewStateValueLabel" type="label" fontColor="darkgray" fontSize="small" alignWithControl="true">
+				<Label>The name of the new state.  Must follow naming conventions.</Label>
+			</Field>
+		</ConfigUI>
+	</Action>
+	<Action id="variableToState">
+		<Name>Variable To State</Name>
+		<CallbackMethod>variableToState</CallbackMethod>
+		<ConfigUI>
+			<Field id="baseName" type="menu">
+				<Label>Base Name:</Label>
+                <List class="self" method="listNamespaces"/>
+			</Field>
+			<Field id="stateVarId" type="menu">
+				<Label>Variable:</Label>
+                <List class="indigo.variables"/>
+			</Field>
+		</ConfigUI>
+	</Action>
+	<Action id="addContext">
+		<Name>Add Context</Name>
+		<CallbackMethod>addContext</CallbackMethod>
+		<ConfigUI>
+			<Field id="baseName" type="menu">
+				<Label>Base Name:</Label>
+                <List class="self" method="listNamespaces"/>
+			</Field>
+			<Field id="contextName" type="textfield">
+				<Label>Context to add:</Label>
+			</Field>
+		</ConfigUI>
+	</Action>
+	<Action id="removeContext">
+		<Name>Remove Context</Name>
+		<CallbackMethod>removeContext</CallbackMethod>
+		<ConfigUI>
+			<Field id="baseName" type="menu">
+				<Label>Base Name:</Label>
+                <List class="self" method="listNamespaces"/>
+			</Field>
+			<Field id="contextName" type="textfield">
+				<Label>Context to remove:</Label>
+			</Field>
+		</ConfigUI>
+	</Action>
+</Actions>
