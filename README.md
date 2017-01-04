@@ -1,6 +1,4 @@
-# State Tree Watcher
-
-*(inspired by the variable-watcher.py example script here: http://wiki.indigodomo.com/doku.php?id=advanced_thermo)*
+# State Tree Actions
 
 ## Overview
 
