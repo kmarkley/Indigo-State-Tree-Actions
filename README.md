@@ -127,7 +127,7 @@ This makes it very easy to refer any state in Conditions for Schedules and Trigg
 
 There is a variable to store currect contexts as a list _(note the double-underscore)_:
 
-	HouseState__Context				[u'Rain',u'Guests']
+	HouseState__Contexts			[u'Rain',u'Guests']
 
 As well a variable for the boolean state of each context:
 
