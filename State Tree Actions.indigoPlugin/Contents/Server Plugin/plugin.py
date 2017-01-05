@@ -21,8 +21,8 @@ kVarSepChar     = u"_"
 kBaseReserved   = (kBaseChar,kStateChar,kContextChar,kExitChar,kVarSepChar)
 kStateReserved  = (kBaseChar,kContextChar,kExitChar,kVarSepChar)
 kChangedSuffix  = u"__LastChange"
-kContextSuffix  = u"__Context"
-kContextExtra   = u"__"
+kContextSuffix  = u"__Contexts"
+kContextExtra   = u"__Context__"
 
 ################################################################################
 class Plugin(indigo.PluginBase):
@@ -198,8 +198,8 @@ class Plugin(indigo.PluginBase):
             for item in newTree.states[i:]:
                 item.stateAction(True)
             # save new state and timestamp to variables
-            self._setValue(baseObj.var, newState)
-            self._setValue(baseObj.changedVar, indigo.server.getTime())
+            self._setVar(baseObj.var, newState)
+            self._setVar(baseObj.changedVar, indigo.server.getTime())
             # execute global exit action group
             baseObj.stateAction(False)
     
@@ -240,10 +240,10 @@ class Plugin(indigo.PluginBase):
         def __init__(self, pluginObj, baseName):
             pluginObj.logger.debug(u"baseState: "+baseName)
             self.name           = baseName
-            self.var            = pluginObj._getVariable(self.name)
+            self.var            = pluginObj._getVar(self.name)
             self.value          = self.var.value
-            self.changedVar     = pluginObj._getVariable(self.name+kChangedSuffix, strip=False)
-            self.contextVar     = pluginObj._getVariable(self.name+kContextSuffix, strip=False)
+            self.changedVar     = pluginObj._getVar(self.name+kChangedSuffix, strip=False)
+            self.contextVar     = pluginObj._getVar(self.name+kContextSuffix, strip=False)
             self.actionName     = self.name
             try:
                 self.contexts = eval(self.contextVar.value)
@@ -264,12 +264,12 @@ class Plugin(indigo.PluginBase):
                 self.contexts.remove(context)
             else:
                 return False
-            self.pluginObj._setValue(self.contextVar, self.contexts)
+            self.pluginObj._setVar(self.contextVar, self.contexts)
             return True
         
         def saveContext(self, context, addFlag):
-            var = self.pluginObj._getVariable(self.contextVar.name+kContextExtra+context, strip=False)
-            self.pluginObj._setValue(var, addFlag)
+            var = self.pluginObj._getVar(self.actionName+kContextExtra+context, strip=False)
+            self.pluginObj._setVar(var, addFlag)
         
         
     # a single state within the hierarchy
@@ -278,7 +278,7 @@ class Plugin(indigo.PluginBase):
             pluginObj.logger.debug(u"singleState: "+stateName)
             self.name           = stateName
             self.actionName     = baseObj.name+kBaseChar+stateName
-            self.var            = pluginObj._getVariable(self.actionName)
+            self.var            = pluginObj._getVar(self.actionName)
             self.pluginObj      = pluginObj
             self.baseObj        = baseObj
         
@@ -287,7 +287,7 @@ class Plugin(indigo.PluginBase):
             for context in self.baseObj.contexts:
                 self.changeContext(context, enterFlag)
             if not enterFlag: self.pluginObj._execute(self.actionName+kExitChar)
-            self.pluginObj._setValue(self.var, enterFlag)
+            self.pluginObj._setVar(self.var, enterFlag)
     
         def changeContext(self, context, addFlag):
             self.pluginObj._execute(self.actionName+kContextChar+context+[kExitChar,''][addFlag])
@@ -324,23 +324,20 @@ class Plugin(indigo.PluginBase):
                 self.logger.info(groupName+u" (missing)")
 
     # Variables
-    def _setValue(self, var, value):
+    def _setVar(self, var, value):
         # just tired of typing unicode()
         indigo.variable.updateValue(var.id, unicode(value))
     
-    def _getVariable(self, name, strip=True):
+    def _getVar(self, name, strip=True):
         def trans(c):
             if c.isalnum():
                 return c
             return kVarSepChar
-        def varNameFix(name, strip=True):
-            str = ''.join(map(trans, name.strip()))
-            if strip:
-              str =  ''.join(kVarSepChar if a==kVarSepChar else ''.join(b) for a,b in groupby(str))
-            return str
         
-        fixedName = unicode(varNameFix(name, strip))
-        self.logger.debug(u"_getVariable: "+fixedName)
+        fixedName = ''.join(map(trans, name.strip()))
+        if strip:
+          fixedName =  ''.join(kVarSepChar if a==kVarSepChar else ''.join(b) for a,b in groupby(fixedName))
+        self.logger.debug(u"_getVar: "+fixedName)
         try:
             var = indigo.variable.create(fixedName, folder=self.folderId)
         except ValueError, e:

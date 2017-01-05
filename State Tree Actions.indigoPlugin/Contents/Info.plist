@@ -10,6 +10,8 @@
 	<string>1.0.0</string>
 	<key>CFBundleDisplayName</key>
 	<string>State Tree Actions</string>
+	<key>CFBundleName</key>
+	<string>State Tree</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.morris.state-tree-actions</string>
 	<key>CFBundleVersion</key>
