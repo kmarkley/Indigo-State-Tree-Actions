@@ -49,19 +49,21 @@ class Plugin(indigo.PluginBase):
 
     def shutdown(self):
         self.logger.debug(u"shutdown")
-        self.pluginPrefs["namespaces"] = self.namespaces
-        self.pluginPrefs["contextDict"] = self.contextDict
-        self.pluginPrefs["lastStateDict"] = self.lastStateDict
+        self.savePluginPrefs()
     
     def runConcurrentThread(self):
         try:
             while True:
-                self.pluginPrefs["namespaces"] = self.namespaces
-                self.pluginPrefs["contextDict"] = self.contextDict
-                self.pluginPrefs["lastStateDict"] = self.lastStateDict
+                self.savePluginPrefs()
                 self.sleep(5*60)
         except self.StopThread:
             pass    # Optionally catch the StopThread exception and do any needed cleanup.
+    
+    def savePluginPrefs(self):
+        self.pluginPrefs["namespaces"] = self.namespaces
+        self.pluginPrefs["contextDict"] = self.contextDict
+        self.pluginPrefs["lastStateDict"] = self.lastStateDict
+        self.pluginPrefs["showDebugInfo"] = self.debug
     
     
     ########################################
@@ -172,9 +174,6 @@ class Plugin(indigo.PluginBase):
                 self.namespaces.remove(baseName)
             self.pluginPrefs["namespaces"] = self.namespaces
             return (True, valuesDict)
-        
-
-        
     
     def listNamespaces(self, filter="", valuesDict=None, typeId="", targetId=0):
         listArray = []
