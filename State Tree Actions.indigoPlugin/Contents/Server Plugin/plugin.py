@@ -170,8 +170,10 @@ class Plugin(indigo.PluginBase):
         else:
             if typeId == "addNamespace":
                 self.namespaces.append(baseName)
+                self.logger.info('>> namespace "%s" added' % baseName)
             elif typeId == "removeNamespace":
                 self.namespaces.remove(baseName)
+                self.logger.info('>> namespace "%s" removed' % baseName)
             self.pluginPrefs["namespaces"] = self.namespaces
             return (True, valuesDict)
     
@@ -200,9 +202,10 @@ class Plugin(indigo.PluginBase):
     def _doStateChange(self, action):
         baseName = action.props.get("baseName")
         newState = action.props.get("stateName")
-        baseObj  = self.baseState(self, baseName)
         self.logger.debug(u"_doStateChange: "+baseName+kBaseChar+newState)
+        baseObj  = self.baseState(self, baseName)
         if newState != baseObj.lastState:
+            self.logger.info('>> go to state "%s"' % (baseName+kBaseChar+newState))
             oldTree  = self.stateTree(self, baseObj, baseObj.lastState)
             newTree  = self.stateTree(self, baseObj, newState)
             # execute global enter action group
@@ -239,6 +242,7 @@ class Plugin(indigo.PluginBase):
         self.logger.debug(u"_doContextChange: "+baseName+kContextChar+context+[kExitChar,''][addFlag])
         baseObj  = self.baseState(self, baseName)
         if baseObj.updateContexts(context, addFlag):
+            self.logger.info('>> %s context "%s"' % (["remove","add"][addFlag], baseName+kContextChar+context))
             oldTree  = self.stateTree(self, baseObj, baseObj.lastState)
             # execute global add context action group
             if addFlag: baseObj.changeContext(context, True)
