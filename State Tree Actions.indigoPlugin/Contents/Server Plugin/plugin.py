@@ -46,7 +46,7 @@ class Plugin(indigo.PluginBase):
         self.namespaces = self.pluginPrefs.get("namespaces",[])
         self.contextDict = self.pluginPrefs.get("contextDict",{})
         self.lastStateDict = self.pluginPrefs.get("lastStateDict",{})
-
+        
     def shutdown(self):
         self.logger.debug(u"shutdown")
         self.savePluginPrefs()
@@ -261,7 +261,7 @@ class Plugin(indigo.PluginBase):
             pluginObj.logger.debug(u"baseState: "+baseName)
             self.name           = baseName
             self.actionName     = self.name
-            self.contexts       = pluginObj.contextDict.get(self.name,[])
+            self.contexts       = list(pluginObj.contextDict.get(self.name,None))
             self.lastState      = pluginObj.lastStateDict.get(self.name,"")
             self.lastVar        = pluginObj._getVar(self.name)
             self.changedVar     = pluginObj._getVar(self.name+kChangedSuffix, strip=False)
