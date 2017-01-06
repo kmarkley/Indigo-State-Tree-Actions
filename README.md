@@ -2,9 +2,9 @@
 
 ## Overview
 
-This plugin creates actions to automate execution of multiple Action Groups based on a hierarchical tree-like structure of '_states_'.  Additional Action Groups are executed for each state depending on multiple inherited '_contexts_'.  The system is analogous to hooks in software development.
+This plugin creates actions to automate execution of multiple Action Groups based on a hierarchical tree-like structure of '_states_'.  Additional Action Groups are executed for each state depending on multiple inherited '_contexts_'.  The system is vaguely analogous to hooks in software development.
 
-Additionally the plugin creates and maintains multiple Variables that track each '_state_' for use in Schedule and/or Trigger conditions.
+Additionally the plugin creates and maintains multiple Variables that track each state for use in Schedule and/or Trigger conditions.
 
 ## Details
 
@@ -26,16 +26,16 @@ Indigo's example variable-watcher.py script would enable executing an Action Gro
 
 When changing from one state to another, this plugin will traverse 'up' the hierarchy of states being exited, attempting to execute an Action Group at each step, then traverse 'down' the hierachy, attempting to execute more Action Groups for each state entered.
 
-Additionally, the plugin will attempt to execute a global enter and global exit Action Group whenever there is any change in state.
+Additionally, the plugin will attempt to execute a global start and global end Action Group whenever there is any change in state.
 
 In the example above, when switching from the 'Work' state to the 'Wake' state, the plugin will try to execute these Action Groups:
 
-	Global Enter
+	Global Start
 	Exit Work
 	Exit Away
 	Enter Home
 	Enter Wake
-	Global Exit
+	Global End
 
 #### Contexts
 
@@ -49,7 +49,7 @@ For every combination of states and contexts, both an enter Action Group and an 
 
 So again in the example above, when switching from the 'Work' state to the 'Wake' state when dark, the following Action Groups might be executed:
 
-	Global Enter
+	Global Start
 	Exit Work/Dark
 	Exit Work
 	Exit Away/Dark
@@ -58,7 +58,7 @@ So again in the example above, when switching from the 'Work' state to the 'Wake
 	Enter Home/Dark
 	Enter Wake
 	Enter Wake/Dark
-	Global Exit
+	Global End
 
 Importantly, ***any Action Group that does not exist will be silently skipped***.
 
@@ -67,11 +67,11 @@ Importantly, ***any Action Group that does not exist will be silently skipped***
 
 All this is accomplished using **strict naming conventions** for Action Groups.
 
-Each state change must have a '_Base Name_' that defines the namespace for all Action Groups.  In the example above, this is 'HouseState'.  This is also the name of the global enter Action Group.
+Each state change must have a '_Base Name_' that defines the namespace for all Action Groups.  In the example above, this is 'HouseState'.  This is also the name of the global start Action Group.
 
 The pipe ('|') character is used to separate the Base Name from the rest of the Action Group name.
 
-Hierarchichal states ate listed in order, separated by the greater than ('>') character.
+Hierarchichal states ate listed in order, separated by the greater-than ('>') character.
 
 For each state, a context may be indicated by the plus ('+') character followed by the context name.
 
@@ -121,7 +121,7 @@ After the above state change, the variables will be:
 	HouseState_Home_Sleep			False
 	HouseState_Home_Wake			True
 
-This makes it very easy to refer any state in Conditions for Schedules and Triggers.
+This makes it very easy to refer any state in conditions for Schedules and Triggers.
 
 #### Context Variables
 
@@ -129,7 +129,7 @@ There is a variable to store currect contexts as a list _(note the double-unders
 
 	HouseState__Contexts			[u'Rain',u'Guests']
 
-As well a variable for the boolean state of each context:
+There are also variables for the boolean state of each context:
 
 	HouseState__Context__Dark		False
 	HouseState__Context__Rain		True
@@ -146,6 +146,12 @@ And another for a time stamp _(note the double-underscore)_:
 
 	HouseState__LastChange			2016-12-17 20:44:04.313000
 
+#### Note
+
+The plugin creates and maintains variables for your use elsewhere in Indigo, but does not rely on them for operation.  Any variable that is deleted or changed will just be re-created or changed-back by the plugin.
+
+If the plugin exits abnormally, it is possible that recent changes to states or contexts won't be remembered by the plugin when it restarts. 
+
 ---
 
 ## Installation
@@ -160,17 +166,17 @@ Enter a name for the folder where the plugin's variables will be stored.  The fo
 * **Log Missing Action Groups**  
 If checked, any Action Group that doesn't exist will be written to the log.  This is a handy way to get names of additional Action Groups that you may wish to create.
 
-* **Enable Debugging**  
-If checked, extensive debug information will be written to the log.
-
 * **Delay between Action Groups**  
 Optionally set a delay in seconds between execution of Action Groups.  Default is 0.5 seconds.
+
+* **Enable Debugging**  
+If checked, extensive debug information will be written to the log.
 
 ## Usage
 
 ### Defining Namespaces
 
-Use the plugin's menu items to add or remove namespaces. Removed namespaces will not delete anything, but will cause existing actions to fail validation.
+Use the plugin's menu items to add or remove namespaces. Removed namespaces will not delete anything, but will cause existing actions to fail validation and write errors to the log.
 
 ### Actions
 

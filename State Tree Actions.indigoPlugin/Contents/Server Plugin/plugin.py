@@ -41,11 +41,27 @@ class Plugin(indigo.PluginBase):
         self.folderId = self._getFolderId(self.pluginPrefs.get("folderName",None))
         self.logMissing = self.pluginPrefs.get("logMissing", False)
         self.debug = self.pluginPrefs.get("showDebugInfo",False)
-        self.namespaces = self.pluginPrefs.get("namespaces",[])
         self.actionSleep = float(self.pluginPrefs.get("actionSleep",0))
+        
+        self.namespaces = self.pluginPrefs.get("namespaces",[])
+        self.contextDict = self.pluginPrefs.get("contextDict",{})
+        self.lastStateDict = self.pluginPrefs.get("lastStateDict",{})
 
     def shutdown(self):
         self.logger.debug(u"shutdown")
+        self.pluginPrefs["namespaces"] = self.namespaces
+        self.pluginPrefs["contextDict"] = self.contextDict
+        self.pluginPrefs["lastStateDict"] = self.lastStateDict
+    
+    def runConcurrentThread(self):
+        try:
+            while True:
+                self.pluginPrefs["namespaces"] = self.namespaces
+                self.pluginPrefs["contextDict"] = self.contextDict
+                self.pluginPrefs["lastStateDict"] = self.lastStateDict
+                self.sleep(5*60)
+        except self.StopThread:
+            pass    # Optionally catch the StopThread exception and do any needed cleanup.
     
     
     ########################################
@@ -135,24 +151,30 @@ class Plugin(indigo.PluginBase):
         self.logger.debug(u"changeNamespace: " + typeId)
         errorsDict = indigo.Dict()
         baseName = valuesDict.get("baseName")
-        if valuesDict.get("baseName","") == u'':
-            errorsDict["baseName"] = "Base Name must be at least one character long"
-        elif any(ch in valuesDict.get("baseName") for ch in kBaseReserved):
-            errorsDict["baseName"] = "Base Name may not contain:  "+"  ".join(kBaseReserved)
         if typeId == "addNamespace":
-            if not baseName in self.namespaces:
-                self.namespaces.append(baseName)
-            else:
+            if baseName in self.namespaces:
                 errorsDict["baseName"] = "Base Name already exists"
+            elif valuesDict.get("baseName","") == u'':
+                errorsDict["baseName"] = "Required"
+            elif any(ch in valuesDict.get("baseName") for ch in kBaseReserved):
+                errorsDict["baseName"] = "Base Name may not contain:  "+"  ".join(kBaseReserved)
         elif typeId == "removeNamespace":
-            if  baseName in self.namespaces:
-                self.namespaces.remove(baseName)
-            else:
+            if valuesDict.get("baseName","") == u'':
+                errorsDict["baseName"] = "Required"
+            elif baseName not in self.namespaces:
                 errorsDict["baseName"] = "Base Name does not exist"
-        self.pluginPrefs["namespaces"] = self.namespaces
         if len(errorsDict) > 0:
             return (False, valuesDict, errorsDict)
-        return (True, valuesDict)
+        else:
+            if typeId == "addNamespace":
+                self.namespaces.append(baseName)
+            elif typeId == "removeNamespace":
+                self.namespaces.remove(baseName)
+            self.pluginPrefs["namespaces"] = self.namespaces
+            return (True, valuesDict)
+        
+
+        
     
     def listNamespaces(self, filter="", valuesDict=None, typeId="", targetId=0):
         listArray = []
@@ -181,8 +203,8 @@ class Plugin(indigo.PluginBase):
         newState = action.props.get("stateName")
         baseObj  = self.baseState(self, baseName)
         self.logger.debug(u"_doStateChange: "+baseName+kBaseChar+newState)
-        if newState != baseObj.value:
-            oldTree  = self.stateTree(self, baseObj, baseObj.value)
+        if newState != baseObj.lastState:
+            oldTree  = self.stateTree(self, baseObj, baseObj.lastState)
             newTree  = self.stateTree(self, baseObj, newState)
             # execute global enter action group
             baseObj.stateAction(True)
@@ -198,8 +220,7 @@ class Plugin(indigo.PluginBase):
             for item in newTree.states[i:]:
                 item.stateAction(True)
             # save new state and timestamp to variables
-            self._setVar(baseObj.var, newState)
-            self._setVar(baseObj.changedVar, indigo.server.getTime())
+            baseObj.saveState(newState)
             # execute global exit action group
             baseObj.stateAction(False)
     
@@ -219,7 +240,7 @@ class Plugin(indigo.PluginBase):
         self.logger.debug(u"_doContextChange: "+baseName+kContextChar+context+[kExitChar,''][addFlag])
         baseObj  = self.baseState(self, baseName)
         if baseObj.updateContexts(context, addFlag):
-            oldTree  = self.stateTree(self, baseObj, baseObj.value)
+            oldTree  = self.stateTree(self, baseObj, baseObj.lastState)
             # execute global add context action group
             if addFlag: baseObj.changeContext(context, True)
             # execute context action group for each nested state
@@ -240,19 +261,22 @@ class Plugin(indigo.PluginBase):
         def __init__(self, pluginObj, baseName):
             pluginObj.logger.debug(u"baseState: "+baseName)
             self.name           = baseName
-            self.var            = pluginObj._getVar(self.name)
-            self.value          = self.var.value
+            self.actionName     = self.name
+            self.contexts       = pluginObj.contextDict.get(self.name,[])
+            self.lastState      = pluginObj.lastStateDict.get(self.name,"")
+            self.lastVar        = pluginObj._getVar(self.name)
             self.changedVar     = pluginObj._getVar(self.name+kChangedSuffix, strip=False)
             self.contextVar     = pluginObj._getVar(self.name+kContextSuffix, strip=False)
-            self.actionName     = self.name
-            try:
-                self.contexts = eval(self.contextVar.value)
-            except:
-                self.contexts = []
             self.pluginObj      = pluginObj
+            
         
         def stateAction(self, enterFlag):
             self.pluginObj._execute(self.actionName+[kExitChar,''][enterFlag])
+        
+        def saveState(self, newState):
+            self.pluginObj.lastStateDict[self.name] = newState
+            self.pluginObj._setVar(self.lastVar, newState)
+            self.pluginObj._setVar(self.changedVar, indigo.server.getTime())
         
         def changeContext(self, context, addFlag):
             self.pluginObj._execute(self.actionName+kContextChar+context+[kExitChar,''][addFlag])
@@ -264,12 +288,13 @@ class Plugin(indigo.PluginBase):
                 self.contexts.remove(context)
             else:
                 return False
-            self.pluginObj._setVar(self.contextVar, self.contexts)
             return True
         
         def saveContext(self, context, addFlag):
+            self.pluginObj.contextDict[self.name] = self.contexts
             var = self.pluginObj._getVar(self.actionName+kContextExtra+context, strip=False)
             self.pluginObj._setVar(var, addFlag)
+            self.pluginObj._setVar(self.contextVar, self.contexts)
         
         
     # a single state within the hierarchy
