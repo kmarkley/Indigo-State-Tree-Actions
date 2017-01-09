@@ -31,4 +31,9 @@
 			</Field>
 		</ConfigUI>
 	</MenuItem>
+	<MenuItem id='debugSeparator' />
+    <MenuItem id='toggleDebug'>
+        <Name>Toggle Debugging</Name>
+		<CallbackMethod>toggleDebug</CallbackMethod>
+	</MenuItem>
 </MenuItems>

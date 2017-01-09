@@ -33,6 +33,9 @@ class Plugin(indigo.PluginBase):
     def __del__(self):
         indigo.PluginBase.__del__(self)
 
+    ########################################
+    # Start and Stop
+    ########################################
     def startup(self):
         self.debug = self.pluginPrefs.get("showDebugInfo",False)
         self.logger.debug(u"startup")
@@ -47,29 +50,31 @@ class Plugin(indigo.PluginBase):
         self.contextDict = self.pluginPrefs.get("contextDict",{})
         self.lastStateDict = self.pluginPrefs.get("lastStateDict",{})
         
+    ########################################
     def shutdown(self):
         self.logger.debug(u"shutdown")
         self.savePluginPrefs()
     
+    ########################################
     def runConcurrentThread(self):
         try:
             while True:
                 self.savePluginPrefs()
-                self.sleep(5*60)
+                self.sleep(600)
         except self.StopThread:
             pass    # Optionally catch the StopThread exception and do any needed cleanup.
     
+    ########################################
     def savePluginPrefs(self):
         self.pluginPrefs["namespaces"] = self.namespaces
         self.pluginPrefs["contextDict"] = self.contextDict
         self.pluginPrefs["lastStateDict"] = self.lastStateDict
         self.pluginPrefs["showDebugInfo"] = self.debug
-    
+        indigo.server.savePluginPrefs()
     
     ########################################
     # Config and Validate
     ########################################
-
     def closedPrefsConfigUi(self, valuesDict, userCancelled):
         self.logger.debug(u"closedPrefsConfigUi")
         if not userCancelled:
@@ -80,6 +85,7 @@ class Plugin(indigo.PluginBase):
             self.folderId = self._getFolderId(valuesDict.get("folderName",None))
             self.actionSleep = float(valuesDict.get("actionSleep",0))
 
+    ########################################
     def validatePrefsConfigUi(self, valuesDict):
         self.logger.debug(u"validatePrefsConfigUi")
         errorsDict = indigo.Dict()
@@ -98,6 +104,7 @@ class Plugin(indigo.PluginBase):
             return (False, valuesDict, errorsDict)
         return (True, valuesDict)
     
+    ########################################
     def validateActionConfigUi(self, valuesDict, typeId, devId, runtime=False):
         self.logger.debug(u"validateActionConfigUi: " + typeId)
         errorsDict = indigo.Dict()
@@ -136,6 +143,7 @@ class Plugin(indigo.PluginBase):
             return (False, valuesDict, errorsDict)
         return (True, valuesDict)
 
+    ########################################
     def _validateRuntime(self, action, typeId):
         valid = self.validateActionConfigUi(action.props, typeId, action.deviceId, runtime=True)
         if not valid[0]:
@@ -144,50 +152,9 @@ class Plugin(indigo.PluginBase):
                 self.logger.error(unicode(valid[2][key]))
         return valid[0]
     
-    
-    ########################################
-    # Menu Methods
-    ########################################
-    
-    def changeNamespace(self, valuesDict="", typeId=""):
-        self.logger.debug(u"changeNamespace: " + typeId)
-        errorsDict = indigo.Dict()
-        baseName = valuesDict.get("baseName")
-        if typeId == "addNamespace":
-            if baseName in self.namespaces:
-                errorsDict["baseName"] = "Base Name already exists"
-            elif valuesDict.get("baseName","") == u'':
-                errorsDict["baseName"] = "Required"
-            elif any(ch in valuesDict.get("baseName") for ch in kBaseReserved):
-                errorsDict["baseName"] = "Base Name may not contain:  "+"  ".join(kBaseReserved)
-        elif typeId == "removeNamespace":
-            if valuesDict.get("baseName","") == u'':
-                errorsDict["baseName"] = "Required"
-            elif baseName not in self.namespaces:
-                errorsDict["baseName"] = "Base Name does not exist"
-        if len(errorsDict) > 0:
-            return (False, valuesDict, errorsDict)
-        else:
-            if typeId == "addNamespace":
-                self.namespaces.append(baseName)
-                self.logger.info('>> namespace "%s" added' % baseName)
-            elif typeId == "removeNamespace":
-                self.namespaces.remove(baseName)
-                self.logger.info('>> namespace "%s" removed' % baseName)
-            self.pluginPrefs["namespaces"] = self.namespaces
-            return (True, valuesDict)
-    
-    def listNamespaces(self, filter="", valuesDict=None, typeId="", targetId=0):
-        listArray = []
-        for baseName in self.namespaces:
-            listArray.append((baseName,baseName))
-        return listArray
-    
-    
     ########################################
     # Action Methods
     ########################################
-    
     def enterNewState(self, action):
         self.logger.debug(u"enterNewState")
         if self._validateRuntime(action, "enterNewState"):
@@ -226,6 +193,7 @@ class Plugin(indigo.PluginBase):
             # execute global exit action group
             baseObj.stateAction(False)
     
+    ########################################
     def addContext(self, action):
         self.logger.debug(u"addContext")
         if self._validateRuntime(action, "addContext"):
@@ -254,13 +222,51 @@ class Plugin(indigo.PluginBase):
             if not addFlag: baseObj.changeContext(context, False)
             baseObj.saveContext(context, addFlag)
         
-   
+    ########################################
+    # Menu Methods
+    ########################################
+    def changeNamespace(self, valuesDict="", typeId=""):
+        self.logger.debug(u"changeNamespace: " + typeId)
+        errorsDict = indigo.Dict()
+        baseName = valuesDict.get("baseName")
+        if typeId == "addNamespace":
+            if baseName in self.namespaces:
+                errorsDict["baseName"] = "Base Name already exists"
+            elif valuesDict.get("baseName","") == u'':
+                errorsDict["baseName"] = "Required"
+            elif any(ch in valuesDict.get("baseName") for ch in kBaseReserved):
+                errorsDict["baseName"] = "Base Name may not contain:  "+"  ".join(kBaseReserved)
+        elif typeId == "removeNamespace":
+            if valuesDict.get("baseName","") == u'':
+                errorsDict["baseName"] = "Required"
+            elif baseName not in self.namespaces:
+                errorsDict["baseName"] = "Base Name does not exist"
+        if len(errorsDict) > 0:
+            return (False, valuesDict, errorsDict)
+        else:
+            if typeId == "addNamespace":
+                self.namespaces.append(baseName)
+                self.logger.info('>> namespace "%s" added' % baseName)
+            elif typeId == "removeNamespace":
+                self.namespaces.remove(baseName)
+                self.logger.info('>> namespace "%s" removed' % baseName)
+            self.pluginPrefs["namespaces"] = self.namespaces
+            return (True, valuesDict)
+    
+    ########################################
+    def toggleDebug(self):
+        if self.debug:
+            self.logger.debug("Debug logging disabled")
+            self.debug = False
+        else:
+            self.debug = True
+            self.logger.debug("Debug logging enabled")
+    
     ########################################
     # Classes
     ########################################
-    
-    # defines the namespace for hierarchical state trees
     class baseState(object):
+        # defines the namespace for hierarchical state trees
         def __init__(self, pluginObj, baseName):
             pluginObj.logger.debug(u"baseState: "+baseName)
             self.name           = baseName
@@ -299,9 +305,9 @@ class Plugin(indigo.PluginBase):
             self.pluginObj._setVar(var, addFlag)
             self.pluginObj._setVar(self.contextVar, self.contexts)
         
-        
-    # a single state within the hierarchy
+    ########################################
     class singleState(object):
+        # a single state within the hierarchy
         def __init__(self, pluginObj, baseObj, stateName):
             pluginObj.logger.debug(u"singleState: "+stateName)
             self.name           = stateName
@@ -320,9 +326,9 @@ class Plugin(indigo.PluginBase):
         def changeContext(self, context, addFlag):
             self.pluginObj._execute(self.actionName+kContextChar+context+[kExitChar,''][addFlag])
 
-
-    # a full list of nested states
+    ########################################
     class stateTree(object):
+        # a full list of nested states
         def __init__(self, pluginObj, baseObj, stateName):
             pluginObj.logger.debug(u"stateTree: "+stateName)
             self.states = []
@@ -334,14 +340,19 @@ class Plugin(indigo.PluginBase):
                     oneState = Plugin.singleState(pluginObj, baseObj, trunk)
                     self.states.append(oneState)
                     trunk += kStateChar
-        
+    
+    ########################################
+    # Menu Callbacks
+    ########################################
+    def listNamespaces(self, filter="", valuesDict=None, typeId="", targetId=0):
+        listArray = []
+        for baseName in self.namespaces:
+            listArray.append((baseName,baseName))
+        return listArray
     
     ########################################
     # Utilities
     ########################################
-
-    
-    # Action Groups
     def _execute(self, groupName):
         self.logger.debug(u"_execute: "+groupName)
         try:
@@ -351,7 +362,7 @@ class Plugin(indigo.PluginBase):
             if self.logMissing:
                 self.logger.info(groupName+u" (missing)")
 
-    # Variables
+    ########################################
     def _setVar(self, var, value):
         # just tired of typing unicode()
         indigo.variable.updateValue(var.id, unicode(value))
@@ -377,6 +388,7 @@ class Plugin(indigo.PluginBase):
             indigo.variable.moveToFolder(var, value=self.folderId)
         return var
     
+    ########################################
     def _getFolderId(self, name):
         self.logger.debug(u"_getFolderId: "+name)
         if name:
