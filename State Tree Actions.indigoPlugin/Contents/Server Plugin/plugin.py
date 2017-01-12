@@ -66,11 +66,21 @@ class Plugin(indigo.PluginBase):
     
     ########################################
     def savePluginPrefs(self):
-        self.pluginPrefs["namespaces"] = self.namespaces
-        self.pluginPrefs["contextDict"] = self.contextDict
-        self.pluginPrefs["lastStateDict"] = self.lastStateDict
-        self.pluginPrefs["showDebugInfo"] = self.debug
-        indigo.server.savePluginPrefs()
+        flSave = False
+        if self.pluginPrefs["namespaces"] != self.namespaces:
+            self.pluginPrefs["namespaces"] = self.namespaces
+            flSave = True
+        if self.pluginPrefs["contextDict"] != self.contextDict:
+            self.pluginPrefs["contextDict"] = self.contextDict
+            flSave = True
+        if self.pluginPrefs["lastStateDict"] != self.lastStateDict:
+            self.pluginPrefs["lastStateDict"] = self.lastStateDict
+            flSave = True
+        if self.pluginPrefs["showDebugInfo"] != self.debug:
+            self.pluginPrefs["showDebugInfo"] = self.debug
+            flSave = True
+        if flSave:
+            indigo.server.savePluginPrefs()
     
     ########################################
     # Config and Validate
