@@ -168,17 +168,14 @@ class Plugin(indigo.PluginBase):
     def enterNewState(self, action):
         self.logger.debug(u"enterNewState")
         if self._validateRuntime(action, "enterNewState"):
-            self._doStateChange(action)
+            self._doStateChange(action.props["baseName"], action.props["stateName"])
         
     def variableToState (self, action):
-        self.logger.debug(u"variableToState: "+indigo.variables[int(action.stateVarId)].name)
+        self.logger.debug(u"variableToState: "+indigo.variables[int(action.props["stateVarId"])].name)
         if self._validateRuntime(action, "variableToState"):
-            action.props["stateName"] = indigo.variables[int(action.stateVarId)].value
-            self._doStateChange(action)
+            self._doStateChange(action.props["baseName"], indigo.variables[int(action.props["stateVarId"])].value)
     
-    def _doStateChange(self, action):
-        baseName = action.props.get("baseName")
-        newState = action.props.get("stateName")
+    def _doStateChange(self, baseName, newState):
         self.logger.debug(u"_doStateChange: "+baseName+kBaseChar+newState)
         baseObj  = self.baseState(self, baseName)
         if newState != baseObj.lastState:
@@ -281,7 +278,7 @@ class Plugin(indigo.PluginBase):
             pluginObj.logger.debug(u"baseState: "+baseName)
             self.name           = baseName
             self.actionName     = self.name
-            self.contexts       = list(pluginObj.contextDict.get(self.name,None))
+            self.contexts       = list(pluginObj.contextDict.get(self.name,""))
             self.lastState      = pluginObj.lastStateDict.get(self.name,"")
             self.lastVar        = pluginObj._getVar(self.name)
             self.changedVar     = pluginObj._getVar(self.name+kChangedSuffix, strip=False)
