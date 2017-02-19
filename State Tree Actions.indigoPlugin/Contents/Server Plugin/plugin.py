@@ -204,16 +204,14 @@ class Plugin(indigo.PluginBase):
     def addContext(self, action):
         self.logger.debug(u"addContext")
         if self._validateRuntime(action, "addContext"):
-            self._doContextChange(action, True)
+            self._doContextChange(action.props["baseName"], action.props["contextName"], True)
     
     def removeContext(self, action):
         self.logger.debug(u"removeContext")
         if self._validateRuntime(action, "removeContext"):
-            self._doContextChange(action, False)
+            self._doContextChange(action.props["baseName"], action.props["contextName"], False)
         
-    def _doContextChange(self, action, addFlag):
-        baseName = action.props.get("baseName")
-        context  = action.props.get("contextName")
+    def _doContextChange(self, baseName, context, addFlag):
         self.logger.debug(u"_doContextChange: "+baseName+kContextChar+context+[kExitChar,''][addFlag])
         baseObj  = self.baseState(self, baseName)
         if baseObj.updateContexts(context, addFlag):
