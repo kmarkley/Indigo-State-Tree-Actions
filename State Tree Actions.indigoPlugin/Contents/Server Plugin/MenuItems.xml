@@ -26,6 +26,10 @@
 		</ConfigUI>
 	</MenuItem>
 	<MenuItem id='debugSeparator' />
+	<MenuItem id='toggleLogMissing'>
+        <Name>Toggle Log Missing Action Groups</Name>
+		<CallbackMethod>toggleLogMissing</CallbackMethod>
+	</MenuItem>
     <MenuItem id='toggleDebug'>
         <Name>Toggle Debugging</Name>
 		<CallbackMethod>toggleDebug</CallbackMethod>
