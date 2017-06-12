@@ -1,14 +1,5 @@
 <?xml version="1.0"?>
-<PluginConfig>	
-    <Field type="textfield" id="folderName" defaultValue="State Tree Watcher">
-        <Label>Folder for Variables:</Label>
-    </Field>
-    <Field id="folderLabel" type="label" fontColor="darkgray" fontSize="small" alignWithControl="true">
-        <Label>Variables will be moved to new folder as the are accessed.  Leave blank for no folder.</Label>
-    </Field>
-    <Field id="spacer1" type="label" fontColor="darkgray" fontSize="small" alignWithControl="true">
-        <Label> </Label>
-    </Field>
+<PluginConfig>
     <Field type="checkbox" id="logMissing" defaultValue="false">
         <Label>Log Missing Action Groups:</Label>
         <Description>Useful to list Action Groups you may wish to create.   </Description>
