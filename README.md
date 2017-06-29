@@ -24,7 +24,7 @@ Each state is mutually-exclusive (you can't be both asleep and awake).
 
 Indigo's example variable-watcher.py script would enable executing an Action Group associated with each state. However, when exiting a state one might reasonable want to un-do whatever actions were taken when entering.
 
-When changing from one state to another, this plugin will traverse 'up' the hierarchy of states being exited, attempting to execute an Action Group at each step, then traverse 'down' the hierachy, attempting to execute more Action Groups for each state entered.
+When changing from one state to another, this plugin will traverse 'up' the hierarchy of states being exited, attempting to execute an Action Group at each step, then traverse 'down' the hierarchy, attempting to execute more Action Groups for each state entered.
 
 Additionally, the plugin will attempt to execute a global start and global end Action Group whenever there is any change in state.
 
@@ -71,13 +71,13 @@ Each state change must have a '_Base Name_' that defines the namespace for all A
 
 The pipe ('|') character is used to separate the Base Name from the rest of the Action Group name.
 
-Hierarchichal states ate listed in order, separated by the greater-than ('>') character.
+Hierarchical states are listed in order, separated by the greater-than ('>') character.
 
 For each state, a context may be indicated by the plus ('+') character followed by the context name.
 
 Lastly, for every Action Group defined above, an exit version may be defined by adding an asterisk ('*') character to the end.
 
-So, using the same example, these are the Action Group names the plugin will attampt to execute:
+So, using the same example, these are the Action Group names the plugin will attempt to execute:
 
 	HouseState
 	HouseState|Away>Work+Dark*
@@ -121,11 +121,11 @@ After the above state change, the variables will be:
 	HouseState_Home_Sleep			False
 	HouseState_Home_Wake			True
 
-This makes it very easy to refer any state in conditions for Schedules and Triggers.
+This makes it very easy to refer to any state in conditions for Schedules and Triggers.
 
 #### Context Variables
 
-There is a variable to store currect contexts as a list _(note the double-underscore)_:
+There is a variable to store current contexts as a list _(note the double-underscore)_:
 
 	HouseState__Contexts			[u'Rain',u'Guests']
 
@@ -146,11 +146,13 @@ And another for a time stamp _(note the double-underscore)_:
 
 	HouseState__LastChange			2016-12-17 20:44:04.313000
 
-#### Note
+#### Notes
 
-The plugin creates and maintains variables for your use elsewhere in Indigo, but does not rely on them for operation.  Any variable that is deleted or changed will just be re-created or changed-back by the plugin.
+* All variables will be created in a folder with the same name as the namespace.
 
-If the plugin exits abnormally, it is possible that recent changes to states or contexts won't be remembered by the plugin when it restarts. 
+* The plugin creates and maintains variables for your use elsewhere in Indigo, but does not rely on them for operation.  Any variable that is deleted or changed will just be re-created or changed-back by the plugin.
+
+* If the plugin exits abnormally, it is possible that recent changes to states or contexts won't be remembered by the plugin when it restarts.
 
 ---
 
@@ -159,9 +161,6 @@ If the plugin exits abnormally, it is possible that recent changes to states or 
 Install like any other Indigo Plugin.
 
 ## Configuration
-
-* **Folder for Variables**  
-Enter a name for the folder where the plugin's variables will be stored.  The folder will be created if it doesn't exist.  If you change folders, variables will be migrated to the new folder ***as they are accessed***.  Variables may also be moved manually to the new folder.
 
 * **Log Missing Action Groups**  
 If checked, any Action Group that doesn't exist will be written to the log.  This is a handy way to get names of additional Action Groups that you may wish to create.
@@ -176,7 +175,7 @@ If checked, extensive debug information will be written to the log.
 
 ### Defining Namespaces
 
-Use the plugin's menu items to add or remove namespaces. Removed namespaces will not delete anything, but will cause existing actions to fail validation and write errors to the log.
+Use the plugin's menu items to add or remove namespaces. Removed namespaces will not delete anything, but will cause existing actions to fail validation and write errors to the log.  Additionally, is a namespace is removed and then re-added, the plugin will not remember the prior state or contexts.
 
 ### Actions
 

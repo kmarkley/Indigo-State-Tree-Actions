@@ -25,7 +25,20 @@
 			</Field>
 		</ConfigUI>
 	</MenuItem>
-	<MenuItem id='debugSeparator' />
+	<MenuItem id="updateSeperator" type="separator" />
+	<MenuItem id="checkForUpdates">
+        <Name>Check for Updates</Name>
+        <CallbackMethod>checkForUpdates</CallbackMethod>
+    </MenuItem>
+    <MenuItem id="updatePlugin">
+        <Name>Update Plugin</Name>
+        <CallbackMethod>updatePlugin</CallbackMethod>
+    </MenuItem>
+    <MenuItem id="forceUpdate">
+        <Name>Force Update</Name>
+        <CallbackMethod>forceUpdate</CallbackMethod>
+    </MenuItem>
+    <MenuItem id="debugSeperator" type="separator" />
 	<MenuItem id='toggleLogMissing'>
         <Name>Toggle Log Missing Action Groups</Name>
 		<CallbackMethod>toggleLogMissing</CallbackMethod>
