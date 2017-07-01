@@ -375,7 +375,7 @@ class StateTree(object):
             indigo.actionGroup.execute(action)
             self.sleep(self.plugin.actionSleep)
         except Exception as e:
-            if isinstance(e, ValueError) and e.message.split(' ',1)[0] == 'ElementNotFoundError':
+            if isinstance(e, ValueError) and e.message.startswith('ElementNotFoundError'):
                 if self.plugin.logMissing:
                     self.logger.info("{} (missing)".format(action))
             else:
@@ -402,7 +402,7 @@ class StateTree(object):
         try:
             var = indigo.variable.create(fixedName, folder=self.folder)
         except Exception as e:
-            if isinstance(e, ValueError) and e.message == 'NameNotUniqueError':
+            if isinstance(e, ValueError) and e.message.startswith('NameNotUniqueError'):
                 var = indigo.variables[fixedName]
             else:
                 self.logger.error('{}: variable error \n{}'.format(self.name, e))
