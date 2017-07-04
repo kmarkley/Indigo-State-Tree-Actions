@@ -246,9 +246,7 @@ class Plugin(indigo.PluginBase):
     #-------------------------------------------------------------------------------
     def syncVariables(self, valuesDict="", typeId=""):
         if valuesDict.get('baseName',""):
-            self.logger.debug('syncing variables for namespace {}'.format(valuesDict['baseName']))
-            tree = self.treeDict[valuesDict['baseName']]
-            tree.syncVariables()
+            self.treeDict[valuesDict['baseName']].syncVariables()
         return (True, valuesDict)
 
     #-------------------------------------------------------------------------------
@@ -338,7 +336,6 @@ class StateTree(object):
             self.lastState = newState
 
             self._executeActions()
-
             self.lock.release()
 
         else:
@@ -371,7 +368,6 @@ class StateTree(object):
             self._setVar(self.changedVar, indigo.server.getTime())
 
             self._executeActions()
-
             self.lock.release()
 
         else:
@@ -381,7 +377,7 @@ class StateTree(object):
     #-------------------------------------------------------------------------------
     def syncVariables(self):
         self.lock.acquire()
-
+        self.logger.debug('syncing variables for namespace {}'.format(self.name))
         for var in indigo.variables.iter():
             if var.folderId == self.folder:
                 if var.id not in (self.lastVar.id, self.changedVar.id, self.contextVar.id):
@@ -392,7 +388,6 @@ class StateTree(object):
             self._setVar(self._getVar(self.name + kContextExtra + context, double_underscores=True), True)
         self._setVar(self.lastVar, self.branch.leaves[-1].name)
         self._setVar(self.contextVar, self.contexts)
-
         self.lock.release()
 
     #-------------------------------------------------------------------------------
