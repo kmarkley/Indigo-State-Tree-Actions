@@ -72,7 +72,9 @@ class Plugin(indigo.PluginBase):
     #-------------------------------------------------------------------------------
     def shutdown(self):
         for namespace in self.namespaces:
-            del self.treeDict[namespace]
+            self.treeDict[namespace].cancel()
+        for namespace in self.namespaces:
+            self.treeDict[namespace].join()
         self.updatePluginPrefs()
 
     #-------------------------------------------------------------------------------
@@ -241,6 +243,8 @@ class Plugin(indigo.PluginBase):
                 self.updatePluginPrefs(self.treeDict[baseName])
                 self.logger.info('>> namespace "{}" added'.format(baseName))
             elif typeId == 'removeNamespace':
+                self.treeDict[baseName].cancel()
+                self.treeDict[baseName].join()
                 del self.treeDict[baseName]
                 self.updatePluginPrefs(self.treeDict[baseName], True)
                 self.logger.info('>> namespace "{}" removed'.format(baseName))
@@ -289,7 +293,6 @@ class StateTree(threading.Thread):
         super(StateTree, self).__init__()
         self.daemon     = False
         self.queue      = Queue.Queue()
-        self.lock       = threading.Lock()
         self.cancelled  = False
 
         self.plugin     = plugin
@@ -309,10 +312,6 @@ class StateTree(threading.Thread):
         self.actionList = list()
 
         self.start()
-
-    #-------------------------------------------------------------------------------
-    def __del__(self):
-        self.cancel()
 
     #-------------------------------------------------------------------------------
     def run(self):
@@ -345,13 +344,12 @@ class StateTree(threading.Thread):
         self.cancelled = True
 
     #-------------------------------------------------------------------------------
-    def addTask(self, task, arg):
+    def addTask(self, task, arg=None):
         self.queue.put((task, arg))
 
     #-------------------------------------------------------------------------------
     def _stateChange(self, newState):
         if newState != self.lastState:
-            self.lock.acquire()
             self.logger.info('>> go to state "{}"'.format(self.name+kBaseChar+newState))
 
             # global enter action group
@@ -386,15 +384,12 @@ class StateTree(threading.Thread):
 
             self._executeActions()
 
-            self.lock.release()
-
         else:
             self.logger.debug('>> already in state "{}"'.format(self.name+kBaseChar+newState))
 
     #-------------------------------------------------------------------------------
     def _contextChange(self, context, enterExitBool):
         if [(context in self.contexts),(context not in self.contexts)][enterExitBool]:
-            self.lock.acquire()
             self.logger.info('>> {} context "{}"'.format(['remove','add'][enterExitBool], self.name+kContextChar+context))
 
             # execute global add context action group
@@ -419,16 +414,12 @@ class StateTree(threading.Thread):
 
             self._executeActions()
 
-            self.lock.release()
-
         else:
             self.logger.debug('>> context "{}" already {}'.format(self.name+kContextChar+context, ['removed','added'][enterExitBool]))
             self.logger.debug('   {} contexts: {}'.format(self.name, self.contexts))
 
     #-------------------------------------------------------------------------------
     def _syncVariables(self):
-        self.lock.acquire()
-
         for var in indigo.variables.iter():
             if var.folderId == self.folder:
                 if var.id not in (self.lastVar.id, self.changedVar.id, self.contextVar.id):
@@ -439,8 +430,6 @@ class StateTree(threading.Thread):
             self._setVar(self._getVar(self.name + kContextExtra + context, double_underscores=True), True)
         self._setVar(self.lastVar, self.branch.leaves[-1].name)
         self._setVar(self.contextVar, self.contexts)
-
-        self.lock.release()
 
     #-------------------------------------------------------------------------------
     def _doAction(self, enterExitBool):
