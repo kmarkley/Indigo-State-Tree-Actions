@@ -299,6 +299,7 @@ class StateTree(object):
         self.contextVar = self._getVar(self.name+kContextSuffix, double_underscores=True)
 
         self.branch     = StateBranch(self, lastState)
+        self.actionList = list()
 
     #-------------------------------------------------------------------------------
     def stateChange(self, newState):
@@ -306,7 +307,7 @@ class StateTree(object):
             self.lock.acquire()
             self.logger.info('>> go to state "{}"'.format(self.name+kBaseChar+newState))
 
-            # execute global enter action group
+            # global enter action group
             self._doAction(kEnter)
 
             oldBranch  = self.branch
@@ -329,12 +330,14 @@ class StateTree(object):
             self._setVar(self.lastVar, newState)
             self._setVar(self.changedVar, indigo.server.getTime())
 
-            # execute global exit action group
+            # global exit action group
             self._doAction(kExit)
 
             # save changes
             self.branch = newBranch
             self.lastState = newState
+
+            self._executeActions()
 
             self.lock.release()
 
@@ -367,6 +370,8 @@ class StateTree(object):
             self._setVar(self.contextVar, self.contexts)
             self._setVar(self.changedVar, indigo.server.getTime())
 
+            self._executeActions()
+
             self.lock.release()
 
         else:
@@ -392,25 +397,31 @@ class StateTree(object):
 
     #-------------------------------------------------------------------------------
     def _doAction(self, enterExitBool):
-        self._execute(self.action+[kExitChar,''][enterExitBool])
+        self._addAction(self.action+[kExitChar,''][enterExitBool])
 
     #-------------------------------------------------------------------------------
     def _doContext(self, context, enterExitBool):
-        self._execute(self.action+kContextChar+context+[kExitChar,''][enterExitBool])
+        self._addAction(self.action+kContextChar+context+[kExitChar,''][enterExitBool])
 
     #-------------------------------------------------------------------------------
-    def _execute(self, action):
-        try:
-            indigo.actionGroup.execute(action)
-            self.sleep(self.plugin.actionSleep)
-        except Exception as e:
-            if isinstance(e, ValueError) and e.message.startswith('ElementNotFoundError'):
-                if self.plugin.logMissing:
-                    self.logger.info("{} (missing)".format(action))
-                elif self.plugin.debug:
-                    self.logger.debug("{} (missing)".format(action))
-            else:
-                self.logger.error('{}: action group execute error \n{}'.format(self.name, e))
+    def _addAction(self, action):
+        self.actionList.append(action)
+
+    #-------------------------------------------------------------------------------
+    def _executeActions(self):
+        for action in self.actionList:
+            try:
+                indigo.actionGroup.execute(action)
+                self.sleep(self.plugin.actionSleep)
+            except Exception as e:
+                if isinstance(e, ValueError) and e.message.startswith('ElementNotFoundError'):
+                    if self.plugin.logMissing:
+                        self.logger.info("{} (missing)".format(action))
+                    elif self.plugin.debug:
+                        self.logger.debug("{} (missing)".format(action))
+                else:
+                    self.logger.error('{}: action group execute error \n{}'.format(self.name, e))
+        self.actionList = list()
 
     #-------------------------------------------------------------------------------
     def _setVar(self, var, value):
@@ -468,12 +479,12 @@ class StateLeaf(object):
 
     #-------------------------------------------------------------------------------
     def _doAction(self, enterExitBool):
-        if enterExitBool == kEnter: self.tree._execute(self.action)
+        if enterExitBool == kEnter: self.tree._addAction(self.action)
         for context in self.tree.contexts:
             self._doContext(context, enterExitBool)
-        if enterExitBool == kExit: self.tree._execute(self.action+kExitChar)
+        if enterExitBool == kExit: self.tree._addAction(self.action+kExitChar)
         self.tree._setVar(self.var, enterExitBool)
 
     #-------------------------------------------------------------------------------
     def _doContext(self, context, enterExitBool):
-        self.tree._execute(self.action+kContextChar+context+[kExitChar,''][enterExitBool])
+        self.tree._addAction(self.action+kContextChar+context+[kExitChar,''][enterExitBool])
