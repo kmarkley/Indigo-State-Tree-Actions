@@ -2,7 +2,7 @@
 <Actions>
 	<Action id="enterNewState">
 		<Name>Enter New State</Name>
-		<CallbackMethod>enterNewState</CallbackMethod>
+		<CallbackMethod>doStateTreeAction</CallbackMethod>
 		<ConfigUI>
 			<Field id="baseName" type="menu">
 				<Label>Base Name:</Label>
@@ -18,7 +18,7 @@
 	</Action>
 	<Action id="variableToState">
 		<Name>Variable To State</Name>
-		<CallbackMethod>variableToState</CallbackMethod>
+		<CallbackMethod>doStateTreeAction</CallbackMethod>
 		<ConfigUI>
 			<Field id="baseName" type="menu">
 				<Label>Base Name:</Label>
@@ -32,7 +32,7 @@
 	</Action>
 	<Action id="addContext">
 		<Name>Add Context</Name>
-		<CallbackMethod>addContext</CallbackMethod>
+		<CallbackMethod>doStateTreeAction</CallbackMethod>
 		<ConfigUI>
 			<Field id="baseName" type="menu">
 				<Label>Base Name:</Label>
@@ -45,7 +45,7 @@
 	</Action>
 	<Action id="removeContext">
 		<Name>Remove Context</Name>
-		<CallbackMethod>removeContext</CallbackMethod>
+		<CallbackMethod>doStateTreeAction</CallbackMethod>
 		<ConfigUI>
 			<Field id="baseName" type="menu">
 				<Label>Base Name:</Label>

@@ -25,6 +25,22 @@
 			</Field>
 		</ConfigUI>
 	</MenuItem>
+	<MenuItem id='syncVariables'>
+        <Name>Sync Variables</Name>
+		<CallbackMethod>syncVariables</CallbackMethod>
+		<ConfigUI>
+			<Field id="baseName" type="menu">
+				<Label>Base Name:</Label>
+                <List class="self" method="listNamespaces"/>
+			</Field>
+			<Field id="syncLabel1" type="label" alignWithControl="true">
+				<Label>All variables in the namespace folder will be affected</Label>
+			</Field>
+			<Field id="syncLabel2" type="label" alignWithControl="true">
+				<Label>  -- including any you placed there manually!!</Label>
+			</Field>
+		</ConfigUI>
+	</MenuItem>
 	<MenuItem id="updateSeperator" type="separator" />
 	<MenuItem id="checkForUpdates">
         <Name>Check for Updates</Name>

@@ -1,10 +1,10 @@
 <?xml version="1.0"?>
 <PluginConfig>
-    <Field type="checkbox" id="logMissing" defaultValue="false">
+    <Field id="logMissing" type="checkbox" defaultValue="false">
         <Label>Log Missing Action Groups:</Label>
         <Description>Useful to list Action Groups you may wish to create.   </Description>
     </Field>
-    <Field type="textfield" id="actionSleep" defaultValue="0.5">
+    <Field id="actionSleep" type="textfield" defaultValue="0.5">
         <Label>Delay between Action Groups:</Label>
     </Field>
     <Field id="spacer2" type="label" fontColor="darkgray" fontSize="small" alignWithControl="true">

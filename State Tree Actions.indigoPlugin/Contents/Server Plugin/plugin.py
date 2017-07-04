@@ -5,6 +5,7 @@
 # http://www.indigodomo.com
 
 import indigo
+import threading
 import time
 from itertools import groupby
 from ghpu import GitHubPluginUpdater
@@ -55,67 +56,55 @@ class Plugin(indigo.PluginBase):
             self.logger.debug("Debug logging enabled")
         self.debug = self.pluginPrefs.get("showDebugInfo",False)
 
+        self.namespaces       = self.pluginPrefs.get('namespaces',[])
+        self.contextDict      = self.pluginPrefs.get('contextDict',{})
+        self.lastStateDict    = self.pluginPrefs.get('lastStateDict',{})
+
         self.treeDict    = dict()
-        namespaces       = self.pluginPrefs.get('namespaces',[])
-        contextDict      = self.pluginPrefs.get('contextDict',{})
-        lastStateDict    = self.pluginPrefs.get('lastStateDict',{})
-        for namespace in namespaces:
+        for namespace in self.namespaces:
             self.treeDict[namespace] = StateTree(self,
                 namespace = namespace,
-                lastState = lastStateDict.get(namespace,''),
-                contexts  = list(contextDict.get(namespace,[]))
+                lastState = self.lastStateDict.get(namespace,''),
+                contexts  = list(self.contextDict.get(namespace,[]))
                 )
 
     #-------------------------------------------------------------------------------
     def shutdown(self):
-        self.savePluginPrefs()
+        self.updatePluginPrefs()
 
     #-------------------------------------------------------------------------------
     def runConcurrentThread(self):
         try:
             while True:
-                self.savePluginPrefs()
                 if time.time() > self.nextCheck:
                     self.checkForUpdates()
-                    self.nextCheck = time.time() + k_updateCheckHours*60*60
                 self.sleep(600)
         except self.StopThread:
             pass
 
     #-------------------------------------------------------------------------------
-    def savePluginPrefs(self):
-        namespaces = list()
-        contextDict = dict()
-        lastStateDict = dict()
-        for name, tree in self.treeDict.items():
-            namespaces.append(name)
-            contextDict[name] = tree.contexts
-            lastStateDict[name] = tree.lastState
+    def updatePluginPrefs(self, tree=None, remove=False):
 
-        flSave = False
-        if self.pluginPrefs.get('namespaces',[]) != namespaces:
-            self.pluginPrefs['namespaces'] = namespaces
-            flSave = True
-        if self.pluginPrefs.get('contextDict',{}) != contextDict:
-            self.pluginPrefs['contextDict'] = contextDict
-            flSave = True
-        if self.pluginPrefs.get('lastStateDict',{}) != lastStateDict:
-            self.pluginPrefs['lastStateDict'] = lastStateDict
-            flSave = True
-        if self.pluginPrefs.get('showDebugInfo',False) != self.debug:
-            self.pluginPrefs['showDebugInfo'] = self.debug
-            flSave = True
-        if self.pluginPrefs.get('logMissing',False) != self.logMissing:
-            self.pluginPrefs['logMissing'] = self.logMissing
-            flSave = True
-        if self.pluginPrefs.get('actionSleep',0.5) != self.actionSleep:
-            self.pluginPrefs['actionSleep'] = self.actionSleep
-            flSave = True
-        if self.pluginPrefs.get('nextUpdateCheck',0) != self.nextCheck:
+        if tree:
+            if remove:
+                self.namspaces.remove(tree.name)
+                del self.lastStateDict[tree.name]
+                del self.contextDict[tree.name]
+            else:
+                if tree.name not in self.namespaces:
+                    self.namespaces.append(tree.name)
+                self.lastStateDict[tree.name] = tree.lastState
+                self.contextDict[tree.name] = tree.contexts
+
+            self.pluginPrefs['namespaces']      = self.namespaces
+            self.pluginPrefs['lastStateDict']   = self.lastStateDict
+            self.pluginPrefs['contextDict']     = self.contextDict
+
+        else:
+            self.pluginPrefs['showDebugInfo']   = self.debug
+            self.pluginPrefs['logMissing']      = self.logMissing
+            self.pluginPrefs['actionSleep']     = self.actionSleep
             self.pluginPrefs['nextUpdateCheck'] = self.nextCheck
-            flSave = True
-        if flSave:
-            indigo.server.savePluginPrefs()
 
     #-------------------------------------------------------------------------------
     # Config and Validate
@@ -123,10 +112,10 @@ class Plugin(indigo.PluginBase):
     def closedPrefsConfigUi(self, valuesDict, userCancelled):
         if not userCancelled:
             self.debug = valuesDict.get('showDebugInfo',False)
-            if self.debug:
-                self.logger.debug("Debug logging enabled")
             self.logMissing = valuesDict.get('logMissing',False)
             self.actionSleep = float(valuesDict.get('actionSleep',0))
+
+            self.logger.debug("Debug logging {}".format(["disabled","enabled"][self.debug]))
 
     #-------------------------------------------------------------------------------
     def validatePrefsConfigUi(self, valuesDict):
@@ -194,31 +183,28 @@ class Plugin(indigo.PluginBase):
     #-------------------------------------------------------------------------------
     # Action Methods
     #-------------------------------------------------------------------------------
-    def enterNewState(self, action):
-        if self._validateRuntime(action, 'enterNewState'):
-            self.treeDict[action.props['baseName']].stateChange(action.props['stateName'])
-
-    #-------------------------------------------------------------------------------
-    def variableToState (self, action):
-        if self._validateRuntime(action, 'variableToState'):
-            self.treeDict[action.props['baseName']].stateChange(indigo.variables[int(action.props['stateVarId'])].value)
-
-    #-------------------------------------------------------------------------------
-    def addContext(self, action):
-        if self._validateRuntime(action, 'addContext'):
-            self.treeDict[action.props['baseName']].contextChange(action.props['contextName'], True)
-
-
-    #-------------------------------------------------------------------------------
-    def removeContext(self, action):
-        if self._validateRuntime(action, 'removeContext'):
-            self.treeDict[action.props['baseName']].contextChange(action.props['contextName'], False)
+    def doStateTreeAction(self, action):
+        if self._validateRuntime(action, action.pluginTypeId):
+            tree = self.treeDict[action.props['baseName']]
+            if action.pluginTypeId == 'enterNewState':
+                tree.stateChange(action.props['stateName'])
+            elif action.pluginTypeId == 'variableToState':
+                tree.stateChange(indigo.variables[int(action.props['stateVarId'])].value)
+            elif action.pluginTypeId == 'addContext':
+                tree.contextChange(action.props['contextName'], True)
+            elif action.pluginTypeId == 'removeContext':
+                tree.contextChange(action.props['contextName'], False)
+            else:
+                self.logger.error("Action not recognized: {}".format(action.pluginTypeId))
+            self.updatePluginPrefs(tree)
 
     #-------------------------------------------------------------------------------
     # Menu Methods
     #-------------------------------------------------------------------------------
     def checkForUpdates(self):
         self.updater.checkForUpdate()
+        self.nextCheck = time.time() + k_updateCheckHours*60*60
+        self.updatePluginPrefs()
 
     #-------------------------------------------------------------------------------
     def updatePlugin(self):
@@ -249,12 +235,21 @@ class Plugin(indigo.PluginBase):
         else:
             if typeId == 'addNamespace':
                 self.treeDict[baseName] = StateTree(self, baseName)
+                self.updatePluginPrefs(self.treeDict[baseName])
                 self.logger.info('>> namespace "{}" added'.format(baseName))
             elif typeId == 'removeNamespace':
+                self.updatePluginPrefs(self.treeDict[baseName], True)
                 del self.treeDict[baseName]
                 self.logger.info('>> namespace "{}" removed'.format(baseName))
-            self.savePluginPrefs()
             return (True, valuesDict)
+
+    #-------------------------------------------------------------------------------
+    def syncVariables(self, valuesDict="", typeId=""):
+        if valuesDict.get('baseName',""):
+            self.logger.debug('syncing variables for namespace {}'.format(valuesDict['baseName']))
+            tree = self.treeDict[valuesDict['baseName']]
+            tree.syncVariables()
+        return (True, valuesDict)
 
     #-------------------------------------------------------------------------------
     def toggleDebug(self):
@@ -264,19 +259,21 @@ class Plugin(indigo.PluginBase):
         else:
             self.debug = True
             self.logger.debug("Debug logging enabled")
+        self.updatePluginPrefs()
 
     #-------------------------------------------------------------------------------
     def toggleLogMissing(self):
         self.logMissing = not self.logMissing
         self.logger.info("Log missing action groups {}".format(['disabled','enabled'][self.logMissing]))
+        self.updatePluginPrefs()
 
     #-------------------------------------------------------------------------------
     # Menu Callbacks
     #-------------------------------------------------------------------------------
     def listNamespaces(self, filter="", valuesDict=None, typeId="", targetId=0):
         listArray = []
-        for baseName in self.treeDict:
-            listArray.append((baseName,baseName))
+        for namespace in self.treeDict:
+            listArray.append((namespace,namespace))
         return listArray
 
 ################################################################################
@@ -289,6 +286,8 @@ class StateTree(object):
         self.plugin     = plugin
         self.logger     = plugin.logger
         self.sleep      = plugin.sleep
+
+        self.lock       = threading.Lock()
 
         self.name       = namespace
         self.action     = namespace
@@ -304,69 +303,99 @@ class StateTree(object):
     #-------------------------------------------------------------------------------
     def stateChange(self, newState):
         if newState != self.lastState:
+            self.lock.acquire()
             self.logger.info('>> go to state "{}"'.format(self.name+kBaseChar+newState))
 
             # execute global enter action group
-            self.doAction(kEnter)
+            self._doAction(kEnter)
 
-            # back out old branch until it matches new branch
             oldBranch  = self.branch
             newBranch  = StateBranch(self, newState)
+
+            # back out old branch until it matches new branch
             leafnames = list(leaf.name for leaf in newBranch.leaves)
             for i, leaf in reversed(list(enumerate(oldBranch.leaves))):
                 if leaf.name in leafnames:
                     i += 1
                     break
-                leaf.doAction(kExit)
+                leaf._doAction(kExit)
             else: i = 0   # if oldBranch is empty, i won't initialize
 
             # enter new branch from matching point
             for leaf in newBranch.leaves[i:]:
-                leaf.doAction(kEnter)
+                leaf._doAction(kEnter)
 
             # save new state and timestamp to variables
             self._setVar(self.lastVar, newState)
             self._setVar(self.changedVar, indigo.server.getTime())
 
             # execute global exit action group
-            self.doAction(kExit)
+            self._doAction(kExit)
 
             # save changes
             self.branch = newBranch
             self.lastState = newState
 
+            self.lock.release()
+
+        else:
+            self.logger.debug('>> already in state "{}"'.format(self.name+kBaseChar+newState))
+
     #-------------------------------------------------------------------------------
     def contextChange(self, context, enterExitBool):
         if [(context in self.contexts),(context not in self.contexts)][enterExitBool]:
+            self.lock.acquire()
             self.logger.info('>> {} context "{}"'.format(['remove','add'][enterExitBool], self.name+kContextChar+context))
 
             # execute global add context action group
             if enterExitBool == kEnter:
-                self.doContext(context, kEnter)
+                self._doContext(context, kEnter)
                 self.contexts.append(context)
 
             # execute context action group for each nested state
             incr = [-1,1][enterExitBool]
             for leaf in self.branch.leaves[::incr]:
-                leaf.doContext(context, enterExitBool)
+                leaf._doContext(context, enterExitBool)
 
             # execute global remove context action group
             if enterExitBool == kExit:
-                self.doContext(context, kExit)
+                self._doContext(context, kExit)
                 self.contexts.remove(context)
 
             # save changes
-            var = self._getVar(self.name + kContextExtra + context, double_underscores=True)
-            self._setVar(var, enterExitBool)
+            self._setVar(self._getVar(self.name + kContextExtra + context, double_underscores=True), enterExitBool)
             self._setVar(self.contextVar, self.contexts)
             self._setVar(self.changedVar, indigo.server.getTime())
 
+            self.lock.release()
+
+        else:
+            self.logger.debug('>> context "{}" already {}'.format(self.name+kContextChar+context, ['removed','added'][enterExitBool]))
+            self.logger.debug('   {} contexts: {}'.format(self.name, self.contexts))
+
     #-------------------------------------------------------------------------------
-    def doAction(self, enterExitBool):
+    def syncVariables(self):
+        self.lock.acquire()
+
+        for var in indigo.variables.iter():
+            if var.folderId == self.folder:
+                if var.id not in (self.lastVar.id, self.changedVar.id, self.contextVar.id):
+                    self._setVar(var, False)
+        for leaf in self.branch.leaves:
+            self._setVar(leaf.var, True)
+        for context in self.contexts:
+            self._setVar(self._getVar(self.name + kContextExtra + context, double_underscores=True), True)
+        self._setVar(self.lastVar, self.branch.leaves[-1].name)
+        self._setVar(self.contextVar, self.contexts)
+
+        self.lock.release()
+
+    #-------------------------------------------------------------------------------
+    def _doAction(self, enterExitBool):
         self._execute(self.action+[kExitChar,''][enterExitBool])
 
     #-------------------------------------------------------------------------------
-    def doContext(self, context, enterExitBool):
+    def _doContext(self, context, enterExitBool):
         self._execute(self.action+kContextChar+context+[kExitChar,''][enterExitBool])
 
     #-------------------------------------------------------------------------------
@@ -378,16 +407,10 @@ class StateTree(object):
             if isinstance(e, ValueError) and e.message.startswith('ElementNotFoundError'):
                 if self.plugin.logMissing:
                     self.logger.info("{} (missing)".format(action))
+                elif self.plugin.debug:
+                    self.logger.debug("{} (missing)".format(action))
             else:
                 self.logger.error('{}: action group execute error \n{}'.format(self.name, e))
-
-    #-------------------------------------------------------------------------------
-    def _getFolder(self):
-        if self.name not in indigo.variables.folders:
-            folder = indigo.variables.folder.create(self.name)
-        else:
-            folder = indigo.variables.folders[self.name]
-        return folder.id
 
     #-------------------------------------------------------------------------------
     def _setVar(self, var, value):
@@ -409,6 +432,14 @@ class StateTree(object):
         if var and (var.folderId != self.folder):
             indigo.variable.moveToFolder(var, value=self.folder)
         return var
+
+    #-------------------------------------------------------------------------------
+    def _getFolder(self):
+        if self.name not in indigo.variables.folders:
+            folder = indigo.variables.folder.create(self.name)
+        else:
+            folder = indigo.variables.folders[self.name]
+        return folder.id
 
 ################################################################################
 class StateBranch(object):
@@ -436,13 +467,13 @@ class StateLeaf(object):
         self.var        = tree._getVar(self.action)
 
     #-------------------------------------------------------------------------------
-    def doAction(self, enterExitBool):
+    def _doAction(self, enterExitBool):
         if enterExitBool == kEnter: self.tree._execute(self.action)
         for context in self.tree.contexts:
-            self.doContext(context, enterExitBool)
+            self._doContext(context, enterExitBool)
         if enterExitBool == kExit: self.tree._execute(self.action+kExitChar)
         self.tree._setVar(self.var, enterExitBool)
 
     #-------------------------------------------------------------------------------
-    def doContext(self, context, enterExitBool):
+    def _doContext(self, context, enterExitBool):
         self.tree._execute(self.action+kContextChar+context+[kExitChar,''][enterExitBool])
