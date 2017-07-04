@@ -192,13 +192,13 @@ class Plugin(indigo.PluginBase):
         if self._validateRuntime(action, action.pluginTypeId):
             tree = self.treeDict[action.props['baseName']]
             if action.pluginTypeId == 'enterNewState':
-                tree.addTask('enterNewState', action.props['stateName'])
+                tree.enterNewState(action.props['stateName'])
             elif action.pluginTypeId == 'variableToState':
-                tree.addTask('enterNewState', indigo.variables[int(action.props['stateVarId'])].value)
+                tree.enterNewState(indigo.variables[int(action.props['stateVarId'])].value)
             elif action.pluginTypeId == 'addContext':
-                tree.addTask('addContext', action.props['contextName'])
+                tree.addContext(action.props['contextName'])
             elif action.pluginTypeId == 'removeContext':
-                tree.addTask('removeContext', action.props['contextName'])
+                tree.removeContext(action.props['contextName'])
             else:
                 self.logger.error("Action not recognized: {}".format(action.pluginTypeId))
             self.updatePluginPrefs(tree)
@@ -255,7 +255,7 @@ class Plugin(indigo.PluginBase):
         if valuesDict.get('baseName',""):
             tree = self.treeDict[valuesDict['baseName']]
             self.logger.debug('syncing variables for namespace {}'.format(tree.name))
-            tree.addTask('syncVariables')
+            tree.syncVariables()
         return (True, valuesDict)
 
     #-------------------------------------------------------------------------------
@@ -318,18 +318,9 @@ class StateTree(threading.Thread):
         self.logger.debug('{}: thread started'.format(self.name))
         while not self.cancelled:
             try:
-                task,arg = self.queue.get(True,2)
+                task,args = self.queue.get(True,2)
                 self.taskTime = time.time()
-                if task == 'enterNewState':
-                    self._stateChange(arg)
-                elif task == 'addContext':
-                    self._contextChange(arg, True)
-                elif task == 'removeContext':
-                    self._contextChange(arg, False)
-                elif task == 'syncVariables':
-                    self._syncVariables()
-                else:
-                    self.logger.error('{}: task "{}" not recognized'.format(self.name,task))
+                task(args)
                 self.queue.task_done()
             except Queue.Empty:
                 pass
@@ -344,8 +335,20 @@ class StateTree(threading.Thread):
         self.cancelled = True
 
     #-------------------------------------------------------------------------------
-    def addTask(self, task, arg=None):
-        self.queue.put((task, arg))
+    def enterNewState(self, newState):
+        self.queue.put((self._stateChange, newState))
+
+    #-------------------------------------------------------------------------------
+    def addContext(self, context):
+        self.queue.put((self._contextChange, (context, True) ))
+
+    #-------------------------------------------------------------------------------
+    def removeContext(self, context):
+        self.queue.put((self._contextChange, (context, False) ))
+
+    #-------------------------------------------------------------------------------
+    def syncVariables(self):
+        self.queue.put((self._syncVariables, None))
 
     #-------------------------------------------------------------------------------
     def _stateChange(self, newState):
@@ -388,7 +391,7 @@ class StateTree(threading.Thread):
             self.logger.debug('>> already in state "{}"'.format(self.name+kBaseChar+newState))
 
     #-------------------------------------------------------------------------------
-    def _contextChange(self, context, enterExitBool):
+    def _contextChange(self, (context,enterExitBool) ):
         if [(context in self.contexts),(context not in self.contexts)][enterExitBool]:
             self.logger.info('>> {} context "{}"'.format(['remove','add'][enterExitBool], self.name+kContextChar+context))
 
@@ -419,7 +422,7 @@ class StateTree(threading.Thread):
             self.logger.debug('   {} contexts: {}'.format(self.name, self.contexts))
 
     #-------------------------------------------------------------------------------
-    def _syncVariables(self):
+    def _syncVariables(self, dummy):
         for var in indigo.variables.iter():
             if var.folderId == self.folder:
                 if var.id not in (self.lastVar.id, self.changedVar.id, self.contextVar.id):
