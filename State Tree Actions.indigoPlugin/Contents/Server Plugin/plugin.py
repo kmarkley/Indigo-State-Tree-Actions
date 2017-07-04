@@ -6,6 +6,7 @@
 
 import indigo
 import threading
+import Queue
 import time
 from itertools import groupby
 from ghpu import GitHubPluginUpdater
@@ -70,6 +71,8 @@ class Plugin(indigo.PluginBase):
 
     #-------------------------------------------------------------------------------
     def shutdown(self):
+        for namespace in self.namespaces:
+            del self.treeDict[namespace]
         self.updatePluginPrefs()
 
     #-------------------------------------------------------------------------------
@@ -187,13 +190,13 @@ class Plugin(indigo.PluginBase):
         if self._validateRuntime(action, action.pluginTypeId):
             tree = self.treeDict[action.props['baseName']]
             if action.pluginTypeId == 'enterNewState':
-                tree.stateChange(action.props['stateName'])
+                tree.addTask('enterNewState', action.props['stateName'])
             elif action.pluginTypeId == 'variableToState':
-                tree.stateChange(indigo.variables[int(action.props['stateVarId'])].value)
+                tree.addTask('enterNewState', indigo.variables[int(action.props['stateVarId'])].value)
             elif action.pluginTypeId == 'addContext':
-                tree.contextChange(action.props['contextName'], True)
+                tree.addTask('addContext', action.props['contextName'])
             elif action.pluginTypeId == 'removeContext':
-                tree.contextChange(action.props['contextName'], False)
+                tree.addTask('removeContext', action.props['contextName'])
             else:
                 self.logger.error("Action not recognized: {}".format(action.pluginTypeId))
             self.updatePluginPrefs(tree)
@@ -238,17 +241,17 @@ class Plugin(indigo.PluginBase):
                 self.updatePluginPrefs(self.treeDict[baseName])
                 self.logger.info('>> namespace "{}" added'.format(baseName))
             elif typeId == 'removeNamespace':
-                self.updatePluginPrefs(self.treeDict[baseName], True)
                 del self.treeDict[baseName]
+                self.updatePluginPrefs(self.treeDict[baseName], True)
                 self.logger.info('>> namespace "{}" removed'.format(baseName))
             return (True, valuesDict)
 
     #-------------------------------------------------------------------------------
     def syncVariables(self, valuesDict="", typeId=""):
         if valuesDict.get('baseName',""):
-            self.logger.debug('syncing variables for namespace {}'.format(valuesDict['baseName']))
             tree = self.treeDict[valuesDict['baseName']]
-            tree.syncVariables()
+            self.logger.debug('syncing variables for namespace {}'.format(tree.name))
+            tree.addTask('syncVariables')
         return (True, valuesDict)
 
     #-------------------------------------------------------------------------------
@@ -279,15 +282,19 @@ class Plugin(indigo.PluginBase):
 ################################################################################
 # Classes
 ################################################################################
-class StateTree(object):
+class StateTree(threading.Thread):
 
     #-------------------------------------------------------------------------------
     def __init__(self, plugin, namespace, lastState=None, contexts=list()):
+        super(StateTree, self).__init__()
+        self.daemon     = False
+        self.queue      = Queue.Queue()
+        self.lock       = threading.Lock()
+        self.cancelled  = False
+
         self.plugin     = plugin
         self.logger     = plugin.logger
         self.sleep      = plugin.sleep
-
-        self.lock       = threading.Lock()
 
         self.name       = namespace
         self.action     = namespace
@@ -301,8 +308,48 @@ class StateTree(object):
         self.branch     = StateBranch(self, lastState)
         self.actionList = list()
 
+        self.start()
+
     #-------------------------------------------------------------------------------
-    def stateChange(self, newState):
+    def __del__(self):
+        self.cancel()
+
+    #-------------------------------------------------------------------------------
+    def run(self):
+        self.logger.debug('{}: thread started'.format(self.name))
+        while not self.cancelled:
+            try:
+                task,arg = self.queue.get(True,2)
+                self.taskTime = time.time()
+                if task == 'enterNewState':
+                    self._stateChange(arg)
+                elif task == 'addContext':
+                    self._contextChange(arg, True)
+                elif task == 'removeContext':
+                    self._contextChange(arg, False)
+                elif task == 'syncVariables':
+                    self._syncVariables()
+                else:
+                    self.logger.error('{}: task "{}" not recognized'.format(self.name,task))
+                self.queue.task_done()
+            except Queue.Empty:
+                pass
+            except Exception as e:
+                self.logger.error('{}: thread error \n{}'.format(self.name, e))
+        else:
+            self.logger.debug('{}: thread cancelled'.format(self.name))
+
+    #-------------------------------------------------------------------------------
+    def cancel(self):
+        """End this thread"""
+        self.cancelled = True
+
+    #-------------------------------------------------------------------------------
+    def addTask(self, task, arg):
+        self.queue.put((task, arg))
+
+    #-------------------------------------------------------------------------------
+    def _stateChange(self, newState):
         if newState != self.lastState:
             self.lock.acquire()
             self.logger.info('>> go to state "{}"'.format(self.name+kBaseChar+newState))
@@ -345,7 +392,7 @@ class StateTree(object):
             self.logger.debug('>> already in state "{}"'.format(self.name+kBaseChar+newState))
 
     #-------------------------------------------------------------------------------
-    def contextChange(self, context, enterExitBool):
+    def _contextChange(self, context, enterExitBool):
         if [(context in self.contexts),(context not in self.contexts)][enterExitBool]:
             self.lock.acquire()
             self.logger.info('>> {} context "{}"'.format(['remove','add'][enterExitBool], self.name+kContextChar+context))
@@ -379,7 +426,7 @@ class StateTree(object):
             self.logger.debug('   {} contexts: {}'.format(self.name, self.contexts))
 
     #-------------------------------------------------------------------------------
-    def syncVariables(self):
+    def _syncVariables(self):
         self.lock.acquire()
 
         for var in indigo.variables.iter():
@@ -425,7 +472,6 @@ class StateTree(object):
 
     #-------------------------------------------------------------------------------
     def _setVar(self, var, value):
-        # just tired of typing unicode()
         indigo.variable.updateValue(var.id, unicode(value))
 
     #-------------------------------------------------------------------------------
