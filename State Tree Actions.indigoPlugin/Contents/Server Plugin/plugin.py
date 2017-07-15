@@ -301,8 +301,9 @@ class StateTree(object):
 
     #-------------------------------------------------------------------------------
     def stateChange(self, newState):
+        self.lock.acquire()
+
         if newState != self.lastState:
-            self.lock.acquire()
             self.logger.info('>> go to state "{}"'.format(self.name+kBaseChar+newState))
 
             # global enter action group
@@ -336,15 +337,17 @@ class StateTree(object):
             self.lastState = newState
 
             self._executeActions()
-            self.lock.release()
 
         else:
             self.logger.debug('>> already in state "{}"'.format(self.name+kBaseChar+newState))
 
+        self.lock.release()
+
     #-------------------------------------------------------------------------------
     def contextChange(self, context, enterExitBool):
+        self.lock.acquire()
+
         if [(context in self.contexts),(context not in self.contexts)][enterExitBool]:
-            self.lock.acquire()
             self.logger.info('>> {} context "{}"'.format(['remove','add'][enterExitBool], self.name+kContextChar+context))
 
             # execute global add context action group
@@ -368,11 +371,11 @@ class StateTree(object):
             self._setVar(self.changedVar, indigo.server.getTime())
 
             self._executeActions()
-            self.lock.release()
 
         else:
             self.logger.debug('>> context "{}" already {}'.format(self.name+kContextChar+context, ['removed','added'][enterExitBool]))
-            self.logger.debug('   {} contexts: {}'.format(self.name, self.contexts))
+            
+        self.lock.release()
 
     #-------------------------------------------------------------------------------
     def syncVariables(self):
