@@ -106,6 +106,8 @@ class Plugin(indigo.PluginBase):
             self.pluginPrefs['actionSleep']     = self.actionSleep
             self.pluginPrefs['nextUpdateCheck'] = self.nextCheck
 
+        indigo.server.savePluginPrefs()
+
     #-------------------------------------------------------------------------------
     # Config and Validate
     #-------------------------------------------------------------------------------
@@ -374,7 +376,7 @@ class StateTree(object):
 
         else:
             self.logger.debug('>> context "{}" already {}'.format(self.name+kContextChar+context, ['removed','added'][enterExitBool]))
-            
+
         self.lock.release()
 
     #-------------------------------------------------------------------------------
