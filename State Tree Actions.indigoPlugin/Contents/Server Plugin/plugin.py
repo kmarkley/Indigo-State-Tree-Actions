@@ -303,97 +303,93 @@ class StateTree(object):
 
     #-------------------------------------------------------------------------------
     def stateChange(self, newState):
-        self.lock.acquire()
+        with self.lock:
 
-        if newState != self.lastState:
-            self.logger.info('>> go to state "{}"'.format(self.name+kBaseChar+newState))
+            if newState != self.lastState:
+                self.logger.info('>> go to state "{}"'.format(self.name+kBaseChar+newState))
+                self.logger.debug('>> prior state "{}"'.format(self.name+kBaseChar+self.lastState))
 
-            # global enter action group
-            self._doAction(kEnter)
+                # global enter action group
+                self._doAction(kEnter)
 
-            oldBranch  = self.branch
-            newBranch  = StateBranch(self, newState)
+                oldBranch  = self.branch
+                newBranch  = StateBranch(self, newState)
 
-            # back out old branch until it matches new branch
-            leafnames = list(leaf.name for leaf in newBranch.leaves)
-            for i, leaf in reversed(list(enumerate(oldBranch.leaves))):
-                if leaf.name in leafnames:
-                    i += 1
-                    break
-                leaf._doAction(kExit)
-            else: i = 0   # if oldBranch is empty, i won't initialize
+                # back out old branch until it matches new branch
+                leafnames = list(leaf.name for leaf in newBranch.leaves)
+                for i, leaf in reversed(list(enumerate(oldBranch.leaves))):
+                    if leaf.name in leafnames:
+                        i += 1
+                        break
+                    leaf._doAction(kExit)
+                else: i = 0   # if oldBranch is empty, i won't initialize
 
-            # enter new branch from matching point
-            for leaf in newBranch.leaves[i:]:
-                leaf._doAction(kEnter)
+                # enter new branch from matching point
+                for leaf in newBranch.leaves[i:]:
+                    leaf._doAction(kEnter)
 
-            # save new state and timestamp to variables
-            self._setVar(self.lastVar, newState)
-            self._setVar(self.changedVar, indigo.server.getTime())
+                # save new state and timestamp to variables
+                self._setVar(self.lastVar, newState)
+                self._setVar(self.changedVar, indigo.server.getTime())
 
-            # global exit action group
-            self._doAction(kExit)
+                # global exit action group
+                self._doAction(kExit)
 
-            # save changes
-            self.branch = newBranch
-            self.lastState = newState
+                # save changes
+                self.branch = newBranch
+                self.lastState = newState
 
-            self._executeActions()
+                self._executeActions()
 
-        else:
-            self.logger.debug('>> already in state "{}"'.format(self.name+kBaseChar+newState))
-
-        self.lock.release()
+            else:
+                self.logger.debug('>> already in state "{}"'.format(self.name+kBaseChar+newState))
 
     #-------------------------------------------------------------------------------
     def contextChange(self, context, enterExitBool):
-        self.lock.acquire()
+        with self.lock:
 
-        if [(context in self.contexts),(context not in self.contexts)][enterExitBool]:
-            self.logger.info('>> {} context "{}"'.format(['remove','add'][enterExitBool], self.name+kContextChar+context))
+            if [(context in self.contexts),(context not in self.contexts)][enterExitBool]:
+                self.logger.info('>> {} context "{}"'.format(['remove','add'][enterExitBool], self.name+kContextChar+context))
 
-            # execute global add context action group
-            if enterExitBool == kEnter:
-                self._doContext(context, kEnter)
-                self.contexts.append(context)
+                # execute global add context action group
+                if enterExitBool == kEnter:
+                    self._doContext(context, kEnter)
+                    self.contexts.append(context)
 
-            # execute context action group for each nested state
-            incr = [-1,1][enterExitBool]
-            for leaf in self.branch.leaves[::incr]:
-                leaf._doContext(context, enterExitBool)
+                # execute context action group for each nested state
+                incr = [-1,1][enterExitBool]
+                for leaf in self.branch.leaves[::incr]:
+                    leaf._doContext(context, enterExitBool)
 
-            # execute global remove context action group
-            if enterExitBool == kExit:
-                self._doContext(context, kExit)
-                self.contexts.remove(context)
+                # execute global remove context action group
+                if enterExitBool == kExit:
+                    self._doContext(context, kExit)
+                    self.contexts.remove(context)
 
-            # save changes
-            self._setVar(self._getVar(self.name + kContextExtra + context, double_underscores=True), enterExitBool)
-            self._setVar(self.contextVar, self.contexts)
-            self._setVar(self.changedVar, indigo.server.getTime())
+                # save changes
+                self._setVar(self._getVar(self.name + kContextExtra + context, double_underscores=True), enterExitBool)
+                self._setVar(self.contextVar, self.contexts)
+                self._setVar(self.changedVar, indigo.server.getTime())
 
-            self._executeActions()
+                self._executeActions()
 
-        else:
-            self.logger.debug('>> context "{}" already {}'.format(self.name+kContextChar+context, ['removed','added'][enterExitBool]))
-
-        self.lock.release()
+            else:
+                self.logger.debug('>> context "{}" already {}'.format(self.name+kContextChar+context, ['removed','added'][enterExitBool]))
 
     #-------------------------------------------------------------------------------
     def syncVariables(self):
-        self.lock.acquire()
-        self.logger.debug('syncing variables for namespace {}'.format(self.name))
-        for var in indigo.variables.iter():
-            if var.folderId == self.folder:
-                if var.id not in (self.lastVar.id, self.changedVar.id, self.contextVar.id):
-                    self._setVar(var, False)
-        for leaf in self.branch.leaves:
-            self._setVar(leaf.var, True)
-        for context in self.contexts:
-            self._setVar(self._getVar(self.name + kContextExtra + context, double_underscores=True), True)
-        self._setVar(self.lastVar, self.branch.leaves[-1].name)
-        self._setVar(self.contextVar, self.contexts)
-        self.lock.release()
+        with self.lock:
+            self.logger.debug('syncing variables for namespace {}'.format(self.name))
+            for var in indigo.variables.iter():
+                if var.folderId == self.folder:
+                    if var.id not in (self.lastVar.id, self.changedVar.id, self.contextVar.id):
+                        self._setVar(var, False)
+            for leaf in self.branch.leaves:
+                self._setVar(leaf.var, True)
+            for context in self.contexts:
+                self._setVar(self._getVar(self.name + kContextExtra + context, double_underscores=True), True)
+            self._setVar(self.lastVar, self.branch.leaves[-1].name)
+            self._setVar(self.contextVar, self.contexts)
 
     #-------------------------------------------------------------------------------
     def _doAction(self, enterExitBool):
@@ -412,12 +408,13 @@ class StateTree(object):
         for action in self.actionList:
             try:
                 indigo.actionGroup.execute(action)
+                self.logger.debug("{} (executed)".format(action))
                 self.sleep(self.plugin.actionSleep)
             except Exception as e:
                 if isinstance(e, ValueError) and e.message.startswith('ElementNotFoundError'):
                     if self.plugin.logMissing:
                         self.logger.info("{} (missing)".format(action))
-                    elif self.plugin.debug:
+                    else:
                         self.logger.debug("{} (missing)".format(action))
                 else:
                     self.logger.error('{}: action group execute error \n{}'.format(self.name, e))
@@ -427,6 +424,7 @@ class StateTree(object):
     def _setVar(self, var, value):
         # just tired of typing unicode()
         indigo.variable.updateValue(var.id, unicode(value))
+        self.logger.debug('Variable "{}" set to "{}"'.format(var.name,value))
 
     #-------------------------------------------------------------------------------
     def _getVar(self, name, double_underscores=False):
@@ -435,6 +433,7 @@ class StateTree(object):
           fixedName =  ''.join(kVarSepChar if a==kVarSepChar else ''.join(b) for a,b in groupby(fixedName))
         try:
             var = indigo.variable.create(fixedName, folder=self.folder)
+            self.logger.debug('Variable "{}" created'.format(fixedName))
         except Exception as e:
             if isinstance(e, ValueError) and e.message.startswith('NameNotUniqueError'):
                 var = indigo.variables[fixedName]
@@ -479,11 +478,11 @@ class StateLeaf(object):
 
     #-------------------------------------------------------------------------------
     def _doAction(self, enterExitBool):
+        self.tree._setVar(self.var, enterExitBool)
         if enterExitBool == kEnter: self.tree._addAction(self.action)
         for context in self.tree.contexts:
             self._doContext(context, enterExitBool)
         if enterExitBool == kExit: self.tree._addAction(self.action+kExitChar)
-        self.tree._setVar(self.var, enterExitBool)
 
     #-------------------------------------------------------------------------------
     def _doContext(self, context, enterExitBool):
