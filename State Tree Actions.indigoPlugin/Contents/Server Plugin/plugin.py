@@ -379,17 +379,30 @@ class StateTree(object):
     #-------------------------------------------------------------------------------
     def syncVariables(self):
         with self.lock:
+            varDict = dict()
             self.logger.debug('syncing variables for namespace {}'.format(self.name))
+
+            # all variables in namespace folder default to False
             for var in indigo.variables.iter():
                 if var.folderId == self.folder:
                     if var.id not in (self.lastVar.id, self.changedVar.id, self.contextVar.id):
-                        self._setVar(var, False)
+                        varDict[var.id] = (var, False)
+            # current leaves in state tree
             for leaf in self.branch.leaves:
-                self._setVar(leaf.var, True)
+                varDict[leaf.var.id] = (leaf.var, True)
+            #current contexts
             for context in self.contexts:
-                self._setVar(self._getVar(self.name + kContextExtra + context, double_underscores=True), True)
-            self._setVar(self.lastVar, self.branch.leaves[-1].name)
-            self._setVar(self.contextVar, self.contexts)
+                var = self._getVar(self.name + kContextExtra + context, double_underscores=True)
+                varDict[var.id] = (var, True)
+            # context list
+            varDict[self.contextVar.id] = (self.contextVar, self.contexts)
+            # last leaf
+            varDict[self.lastVar.id] = (self.lastVar, self.branch.leaves[-1].name)
+
+            # update the variables
+            for varId in varDict:
+                var, val = varDict[varId]
+                self._setVar(var,val)
 
     #-------------------------------------------------------------------------------
     def _doAction(self, enterExitBool):
@@ -408,14 +421,14 @@ class StateTree(object):
         for action in self.actionList:
             try:
                 indigo.actionGroup.execute(action)
-                self.logger.debug("{} (executed)".format(action))
+                self.logger.debug("{}: executed".format(action))
                 self.sleep(self.plugin.actionSleep)
             except Exception as e:
                 if isinstance(e, ValueError) and e.message.startswith('ElementNotFoundError'):
                     if self.plugin.logMissing:
-                        self.logger.info("{} (missing)".format(action))
+                        self.logger.info("{}: missing".format(action))
                     else:
-                        self.logger.debug("{} (missing)".format(action))
+                        self.logger.debug("{}: missing".format(action))
                 else:
                     self.logger.error('{}: action group execute error \n{}'.format(self.name, e))
         self.actionList = list()
@@ -424,7 +437,7 @@ class StateTree(object):
     def _setVar(self, var, value):
         # just tired of typing unicode()
         indigo.variable.updateValue(var.id, unicode(value))
-        self.logger.debug('Variable "{}" set to "{}"'.format(var.name,value))
+        self.logger.debug('{}: {}'.format(var.name,value))
 
     #-------------------------------------------------------------------------------
     def _getVar(self, name, double_underscores=False):
@@ -433,7 +446,7 @@ class StateTree(object):
           fixedName =  ''.join(kVarSepChar if a==kVarSepChar else ''.join(b) for a,b in groupby(fixedName))
         try:
             var = indigo.variable.create(fixedName, folder=self.folder)
-            self.logger.debug('Variable "{}" created'.format(fixedName))
+            self.logger.debug('{}: created'.format(fixedName))
         except Exception as e:
             if isinstance(e, ValueError) and e.message.startswith('NameNotUniqueError'):
                 var = indigo.variables[fixedName]
