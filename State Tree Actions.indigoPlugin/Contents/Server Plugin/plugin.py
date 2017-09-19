@@ -290,7 +290,7 @@ class StateTree(object):
         self.lock       = threading.Lock()
 
         self.name       = namespace
-        self.action     = namespace
+        self.actionName = namespace
         self.lastState  = lastState
         self.contexts   = contexts
         self.folder     = self._getFolder()
@@ -300,6 +300,7 @@ class StateTree(object):
 
         self.branch     = StateBranch(self, lastState)
         self.actionList = list()
+        self.variableDict = dict()
 
     #-------------------------------------------------------------------------------
     def stateChange(self, newState):
@@ -310,7 +311,7 @@ class StateTree(object):
                 self.logger.debug('>> prior state "{}"'.format(self.name+kBaseChar+self.lastState))
 
                 # global enter action group
-                self._doAction(kEnter)
+                self._setAction(kEnter)
 
                 oldBranch  = self.branch
                 newBranch  = StateBranch(self, newState)
@@ -321,25 +322,26 @@ class StateTree(object):
                     if leaf.name in leafnames:
                         i += 1
                         break
-                    leaf._doAction(kExit)
+                    leaf._setAction(kExit)
                 else: i = 0   # if oldBranch is empty, i won't initialize
 
                 # enter new branch from matching point
                 for leaf in newBranch.leaves[i:]:
-                    leaf._doAction(kEnter)
+                    leaf._setAction(kEnter)
 
                 # save new state and timestamp to variables
-                self._setVar(self.lastVar, newState)
-                self._setVar(self.changedVar, indigo.server.getTime())
+                self._queueVariable(self.lastVar, newState)
+                self._queueVariable(self.changedVar, indigo.server.getTime())
 
                 # global exit action group
-                self._doAction(kExit)
+                self._setAction(kExit)
 
                 # save changes
                 self.branch = newBranch
                 self.lastState = newState
 
                 self._executeActions()
+                self._changeVariables()
 
             else:
                 self.logger.debug('>> already in state "{}"'.format(self.name+kBaseChar+newState))
@@ -353,25 +355,26 @@ class StateTree(object):
 
                 # execute global add context action group
                 if enterExitBool == kEnter:
-                    self._doContext(context, kEnter)
+                    self._setContext(context, kEnter)
                     self.contexts.append(context)
 
                 # execute context action group for each nested state
                 incr = [-1,1][enterExitBool]
                 for leaf in self.branch.leaves[::incr]:
-                    leaf._doContext(context, enterExitBool)
+                    leaf._setContext(context, enterExitBool)
 
                 # execute global remove context action group
                 if enterExitBool == kExit:
-                    self._doContext(context, kExit)
+                    self._setContext(context, kExit)
                     self.contexts.remove(context)
 
                 # save changes
-                self._setVar(self._getVar(self.name + kContextExtra + context, double_underscores=True), enterExitBool)
-                self._setVar(self.contextVar, self.contexts)
-                self._setVar(self.changedVar, indigo.server.getTime())
+                self._queueVariable(self._getVar(self.name + kContextExtra + context, double_underscores=True), enterExitBool)
+                self._queueVariable(self.contextVar, self.contexts)
+                self._queueVariable(self.changedVar, indigo.server.getTime())
 
                 self._executeActions()
+                self._changeVariables()
 
             else:
                 self.logger.debug('>> context "{}" already {}'.format(self.name+kContextChar+context, ['removed','added'][enterExitBool]))
@@ -379,41 +382,38 @@ class StateTree(object):
     #-------------------------------------------------------------------------------
     def syncVariables(self):
         with self.lock:
-            varDict = dict()
             self.logger.debug('syncing variables for namespace {}'.format(self.name))
 
             # all variables in namespace folder default to False
             for var in indigo.variables.iter():
                 if var.folderId == self.folder:
                     if var.id not in (self.lastVar.id, self.changedVar.id, self.contextVar.id):
-                        varDict[var.id] = (var, False)
+                        self.queueVariable(var, False)
             # current leaves in state tree
             for leaf in self.branch.leaves:
-                varDict[leaf.var.id] = (leaf.var, True)
+                self.queueVariable(leaf.var, True)
             #current contexts
             for context in self.contexts:
                 var = self._getVar(self.name + kContextExtra + context, double_underscores=True)
-                varDict[var.id] = (var, True)
+                self.queueVariable(var, True)
             # context list
-            varDict[self.contextVar.id] = (self.contextVar, self.contexts)
+            self.queueVariable(self.contextVar, self.contexts)
             # last leaf
-            varDict[self.lastVar.id] = (self.lastVar, self.branch.leaves[-1].name)
+            self.queueVariable(self.lastVar, self.branch.leaves[-1].name)
 
             # update the variables
-            for varId in varDict:
-                var, val = varDict[varId]
-                self._setVar(var,val)
+            self._changeVariables()
 
     #-------------------------------------------------------------------------------
-    def _doAction(self, enterExitBool):
-        self._addAction(self.action+[kExitChar,''][enterExitBool])
+    def _setAction(self, enterExitBool):
+        self._queueAction(self.actionName+[kExitChar,''][enterExitBool])
 
     #-------------------------------------------------------------------------------
-    def _doContext(self, context, enterExitBool):
-        self._addAction(self.action+kContextChar+context+[kExitChar,''][enterExitBool])
+    def _setContext(self, context, enterExitBool):
+        self._queueAction(self.actionName+kContextChar+context+[kExitChar,''][enterExitBool])
 
     #-------------------------------------------------------------------------------
-    def _addAction(self, action):
+    def _queueAction(self, action):
         self.actionList.append(action)
 
     #-------------------------------------------------------------------------------
@@ -434,10 +434,16 @@ class StateTree(object):
         self.actionList = list()
 
     #-------------------------------------------------------------------------------
-    def _setVar(self, var, value):
-        # just tired of typing unicode()
-        indigo.variable.updateValue(var.id, unicode(value))
-        self.logger.debug('{}: {}'.format(var.name,value))
+    def _queueVariable(self, var, value):
+        self.variableDict[var.id] = (var, value)
+
+    #-------------------------------------------------------------------------------
+    def _changeVariables(self):
+        for varId in self.variableDict:
+            var, value = self.variableDict[varId]
+            indigo.variable.updateValue(var.id, unicode(value))
+            self.logger.debug('{}: {}'.format(var.name,value))
+        self.variableDict = dict()
 
     #-------------------------------------------------------------------------------
     def _getVar(self, name, double_underscores=False):
@@ -486,17 +492,17 @@ class StateLeaf(object):
     def __init__(self, tree, leaf):
         self.tree       = tree
         self.name       = leaf
-        self.action     = tree.name+kBaseChar+leaf
-        self.var        = tree._getVar(self.action)
+        self.actionName = tree.name+kBaseChar+leaf
+        self.var        = tree._getVar(self.actionName)
 
     #-------------------------------------------------------------------------------
-    def _doAction(self, enterExitBool):
-        self.tree._setVar(self.var, enterExitBool)
-        if enterExitBool == kEnter: self.tree._addAction(self.action)
+    def _setAction(self, enterExitBool):
+        self.tree._queueVariable(self.var, enterExitBool)
+        if enterExitBool == kEnter: self.tree._queueAction(self.actionName)
         for context in self.tree.contexts:
-            self._doContext(context, enterExitBool)
-        if enterExitBool == kExit: self.tree._addAction(self.action+kExitChar)
+            self._setContext(context, enterExitBool)
+        if enterExitBool == kExit: self.tree._queueAction(self.actionName+kExitChar)
 
     #-------------------------------------------------------------------------------
-    def _doContext(self, context, enterExitBool):
-        self.tree._addAction(self.action+kContextChar+context+[kExitChar,''][enterExitBool])
+    def _setContext(self, context, enterExitBool):
+        self.tree._queueAction(self.actionName+kContextChar+context+[kExitChar,''][enterExitBool])
