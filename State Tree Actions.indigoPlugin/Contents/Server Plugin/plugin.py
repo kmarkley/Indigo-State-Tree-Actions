@@ -53,7 +53,7 @@ class Plugin(indigo.PluginBase):
         self.actionSleep = float(self.pluginPrefs.get("actionSleep",0))
         self.debug       = self.pluginPrefs.get("showDebugInfo",False)
         if self.debug:
-            self.logger.debug("Debug logging enabled")
+            self.logger.debug('Debug logging enabled')
         self.debug = self.pluginPrefs.get("showDebugInfo",False)
 
         self.namespaces       = self.pluginPrefs.get('namespaces',[])
@@ -117,7 +117,7 @@ class Plugin(indigo.PluginBase):
             self.logMissing = valuesDict.get('logMissing',False)
             self.actionSleep = float(valuesDict.get('actionSleep',0))
 
-            self.logger.debug("Debug logging {}".format(["disabled","enabled"][self.debug]))
+            self.logger.debug('Debug logging {}'.format(['disabled','enabled'][self.debug]))
 
     #-------------------------------------------------------------------------------
     def validatePrefsConfigUi(self, valuesDict):
@@ -197,7 +197,7 @@ class Plugin(indigo.PluginBase):
             elif action.pluginTypeId == 'removeContext':
                 tree.contextChange(action.props['contextName'], False)
             else:
-                self.logger.error("Action not recognized: {}".format(action.pluginTypeId))
+                self.logger.error('Action not recognized: {}'.format(action.pluginTypeId))
             self.updatePluginPrefs(tree)
 
     #-------------------------------------------------------------------------------
@@ -238,11 +238,11 @@ class Plugin(indigo.PluginBase):
             if typeId == 'addNamespace':
                 self.treeDict[baseName] = StateTree(self, baseName)
                 self.updatePluginPrefs(self.treeDict[baseName])
-                self.logger.info('>> namespace "{}" added'.format(baseName))
+                self.logger.info('>>> namespace "{}" added'.format(baseName))
             elif typeId == 'removeNamespace':
                 self.updatePluginPrefs(self.treeDict[baseName], True)
                 del self.treeDict[baseName]
-                self.logger.info('>> namespace "{}" removed'.format(baseName))
+                self.logger.info('>>> namespace "{}" removed'.format(baseName))
             return (True, valuesDict)
 
     #-------------------------------------------------------------------------------
@@ -254,17 +254,17 @@ class Plugin(indigo.PluginBase):
     #-------------------------------------------------------------------------------
     def toggleDebug(self):
         if self.debug:
-            self.logger.debug("Debug logging disabled")
+            self.logger.debug('Debug logging disabled')
             self.debug = False
         else:
             self.debug = True
-            self.logger.debug("Debug logging enabled")
+            self.logger.debug('Debug logging enabled')
         self.updatePluginPrefs()
 
     #-------------------------------------------------------------------------------
     def toggleLogMissing(self):
         self.logMissing = not self.logMissing
-        self.logger.info("Log missing action groups {}".format(['disabled','enabled'][self.logMissing]))
+        self.logger.info('Log missing action groups {}'.format(['disabled','enabled'][self.logMissing]))
         self.updatePluginPrefs()
 
     #-------------------------------------------------------------------------------
@@ -282,7 +282,7 @@ class Plugin(indigo.PluginBase):
 class StateTree(object):
 
     #-------------------------------------------------------------------------------
-    def __init__(self, plugin, namespace, lastState=None, contexts=list()):
+    def __init__(self, plugin, namespace, lastState="", contexts=list()):
         self.plugin     = plugin
         self.logger     = plugin.logger
         self.sleep      = plugin.sleep
@@ -307,8 +307,8 @@ class StateTree(object):
         with self.lock:
 
             if newState != self.lastState:
-                self.logger.info('>> go to state "{}"'.format(self.name+kBaseChar+newState))
-                self.logger.debug('>> prior state "{}"'.format(self.name+kBaseChar+self.lastState))
+                self.logger.info('>>> go to state "{}"'.format(self.name+kBaseChar+newState))
+                self.logger.debug('>>> prior state "{}"'.format(self.name+kBaseChar+self.lastState))
 
                 # global enter action group
                 self._setAction(kEnter)
@@ -344,14 +344,14 @@ class StateTree(object):
                 self._changeVariables()
 
             else:
-                self.logger.debug('>> already in state "{}"'.format(self.name+kBaseChar+newState))
+                self.logger.debug('>>> already in state "{}"'.format(self.name+kBaseChar+newState))
 
     #-------------------------------------------------------------------------------
     def contextChange(self, context, enterExitBool):
         with self.lock:
 
             if [(context in self.contexts),(context not in self.contexts)][enterExitBool]:
-                self.logger.info('>> {} context "{}"'.format(['remove','add'][enterExitBool], self.name+kContextChar+context))
+                self.logger.info('>>> {} context "{}"'.format(['remove','add'][enterExitBool], self.name+kContextChar+context))
 
                 # execute global add context action group
                 if enterExitBool == kEnter:
@@ -377,29 +377,29 @@ class StateTree(object):
                 self._changeVariables()
 
             else:
-                self.logger.debug('>> context "{}" already {}'.format(self.name+kContextChar+context, ['removed','added'][enterExitBool]))
+                self.logger.debug('>>> context "{}" already {}'.format(self.name+kContextChar+context, ['removed','added'][enterExitBool]))
 
     #-------------------------------------------------------------------------------
     def syncVariables(self):
         with self.lock:
-            self.logger.debug('syncing variables for namespace {}'.format(self.name))
+            self.logger.debug('syncing variables for namespace "{}"'.format(self.name))
 
             # all variables in namespace folder default to False
             for var in indigo.variables.iter():
                 if var.folderId == self.folder:
                     if var.id not in (self.lastVar.id, self.changedVar.id, self.contextVar.id):
-                        self.queueVariable(var, False)
+                        self._queueVariable(var, False)
             # current leaves in state tree
             for leaf in self.branch.leaves:
-                self.queueVariable(leaf.var, True)
+                self._queueVariable(leaf.var, True)
             #current contexts
             for context in self.contexts:
                 var = self._getVar(self.name + kContextExtra + context, double_underscores=True)
-                self.queueVariable(var, True)
+                self._queueVariable(var, True)
             # context list
-            self.queueVariable(self.contextVar, self.contexts)
+            self._queueVariable(self.contextVar, self.contexts)
             # last leaf
-            self.queueVariable(self.lastVar, self.branch.leaves[-1].name)
+            self._queueVariable(self.lastVar, self.branch.leaves[-1].name)
 
             # update the variables
             self._changeVariables()
@@ -418,17 +418,18 @@ class StateTree(object):
 
     #-------------------------------------------------------------------------------
     def _executeActions(self):
+        self.logger.debug('>>> action groups:')
         for action in self.actionList:
             try:
                 indigo.actionGroup.execute(action)
-                self.logger.debug("{}: executed".format(action))
+                self.logger.debug('    {}: executed'.format(action))
                 self.sleep(self.plugin.actionSleep)
             except Exception as e:
                 if isinstance(e, ValueError) and e.message.startswith('ElementNotFoundError'):
                     if self.plugin.logMissing:
-                        self.logger.info("{}: missing".format(action))
+                        self.logger.info('{}: missing'.format(action))
                     else:
-                        self.logger.debug("{}: missing".format(action))
+                        self.logger.debug('    {}: missing'.format(action))
                 else:
                     self.logger.error('{}: action group execute error \n{}'.format(self.name, e))
         self.actionList = list()
@@ -439,27 +440,24 @@ class StateTree(object):
 
     #-------------------------------------------------------------------------------
     def _changeVariables(self):
+        self.logger.debug('>>> variables:')
         for varId in self.variableDict:
             var, value = self.variableDict[varId]
             indigo.variable.updateValue(var.id, unicode(value))
-            self.logger.debug('{}: {}'.format(var.name,value))
+            self.logger.debug('    {}: {}'.format(var.name,value))
         self.variableDict = dict()
 
     #-------------------------------------------------------------------------------
     def _getVar(self, name, double_underscores=False):
         fixedName = ''.join(x if x.isalnum() else kVarSepChar for x in name.strip())
         if not double_underscores:
-          fixedName =  ''.join(kVarSepChar if a==kVarSepChar else ''.join(b) for a,b in groupby(fixedName))
+            fixedName =  ''.join(kVarSepChar if a==kVarSepChar else ''.join(b) for a,b in groupby(fixedName))
         try:
+            var = indigo.variables[fixedName]
+            if var.folderId != self.folder:
+                indigo.variable.moveToFolder(var, value=self.folder)
+        except KeyError:
             var = indigo.variable.create(fixedName, folder=self.folder)
-            self.logger.debug('{}: created'.format(fixedName))
-        except Exception as e:
-            if isinstance(e, ValueError) and e.message.startswith('NameNotUniqueError'):
-                var = indigo.variables[fixedName]
-            else:
-                self.logger.error('{}: variable error \n{}'.format(self.name, e))
-        if var and (var.folderId != self.folder):
-            indigo.variable.moveToFolder(var, value=self.folder)
         return var
 
     #-------------------------------------------------------------------------------
