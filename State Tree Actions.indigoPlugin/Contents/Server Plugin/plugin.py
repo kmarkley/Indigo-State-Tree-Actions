@@ -204,7 +204,15 @@ class Plugin(indigo.PluginBase):
     # Menu Methods
     #-------------------------------------------------------------------------------
     def checkForUpdates(self):
-        self.updater.checkForUpdate()
+        try:
+            self.updater.checkForUpdate()
+        except Exception as e:
+            msg = 'Check for update error.  Next attempt in {} hours.'.format(k_updateCheckHours)
+            if self.debug:
+                self.logger.exception(msg)
+            else:
+                self.logger.error(msg)
+                self.logger.debug(e)
         self.nextCheck = time.time() + k_updateCheckHours*60*60
         self.updatePluginPrefs()
 
@@ -336,10 +344,11 @@ class StateTree(object):
                 # global exit action group
                 self._setAction(kExit)
 
-                # save changes
+                # save new state
                 self.branch = newBranch
                 self.lastState = newState
 
+                # make the change
                 self._executeActions()
                 self._changeVariables()
 
