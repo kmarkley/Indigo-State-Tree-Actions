@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>PluginVersion</key>
-	<string>0.0.10</string>
+	<string>0.0.11</string>
 	<key>ServerApiVersion</key>
 	<string>2.0</string>
 	<key>IwsApiVersion</key>
@@ -23,5 +23,12 @@
 			<string>https://github.com/kmarkley/Indigo-State-Tree-Actions</string>
 		</dict>
 	</array>
+	<key>GithubInfo</key>
+	<dict>
+		<key>GithubRepo</key>
+		<string>Indigo-State-Tree-Actions</string>
+		<key>GithubUser</key>
+		<string>kmarkley</string>
+	</dict>
 </dict>
 </plist>
