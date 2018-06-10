@@ -57,13 +57,15 @@ class Plugin(indigo.PluginBase):
             self.logger.debug(u'Debug logging enabled')
         self.debug = self.pluginPrefs.get("showDebugInfo",False)
 
-        lastStateDict = self.pluginPrefs.get('lastStateDict',{})
-        contextDict   = self.pluginPrefs.get('contextDict',{})
-        self.treeDict = {namespace:StateTree(self,
-                                             namespace = namespace,
-                                             lastState = lastStateDict.get(namespace,u''),
-                                             contexts  = list(contextDict.get(namespace,[]))
-                                            ) for namespace in lastStateDict}
+        lastStateDict  = self.pluginPrefs.get('lastStateDict',dict())
+        priorStateDict = self.pluginPrefs.get('priorStateDict',dict())
+        contextDict    = self.pluginPrefs.get('contextDict',dict())
+        self.treeDict  = {namespace:StateTree(self,
+                                              namespace  = namespace,
+                                              lastState  = lastStateDict.get(namespace,u''),
+                                              priorState = priorStateDict.get(namespace,u''),
+                                              contexts   = list(contextDict.get(namespace,[]))
+                                              ) for namespace in lastStateDict}
 
     #-------------------------------------------------------------------------------
     def shutdown(self):
@@ -90,8 +92,9 @@ class Plugin(indigo.PluginBase):
 
     #-------------------------------------------------------------------------------
     def saveNamespaceStates(self):
-        self.pluginPrefs['lastStateDict'] = {name:tree.lastState for name,tree in self.treeDict.items()}
-        self.pluginPrefs['contextDict']   = {name:tree.contexts  for name,tree in self.treeDict.items()}
+        self.pluginPrefs['lastStateDict']  = {name:tree.lastState  for name,tree in self.treeDict.items()}
+        self.pluginPrefs['priorStateDict'] = {name:tree.priorState for name,tree in self.treeDict.items()}
+        self.pluginPrefs['contextDict']    = {name:tree.contexts   for name,tree in self.treeDict.items()}
 
         indigo.server.savePluginPrefs()
 
@@ -193,7 +196,7 @@ class Plugin(indigo.PluginBase):
             elif action.pluginTypeId == 'variableToState':
                 tree.stateChange(indigo.variables[int(action.props['stateVarId'])].value)
             elif action.pluginTypeId == 'revertToPriorState':
-                tree.stateChange(indigo.variables[tree.priorVar].value)
+                tree.stateRevert()
             elif action.pluginTypeId == 'addContext':
                 tree.contextChange(action.props['contextName'], True)
             elif action.pluginTypeId == 'removeContext':
@@ -289,26 +292,31 @@ class Plugin(indigo.PluginBase):
 class StateTree(object):
 
     #-------------------------------------------------------------------------------
-    def __init__(self, plugin, namespace, lastState=u"", contexts=list()):
-        self.plugin     = plugin
-        self.logger     = plugin.logger
-        self.sleep      = plugin.sleep
+    def __init__(self, plugin, namespace, lastState=u"", priorState=u"", contexts=list()):
+        self.plugin      = plugin
+        self.logger      = plugin.logger
+        self.sleep       = plugin.sleep
 
-        self.lock       = threading.Lock()
+        self.lock        = threading.Lock()
 
-        self.name       = namespace
-        self.actionName = namespace
-        self.lastState  = lastState
-        self.contexts   = contexts
-        self.folder     = self._getFolder()
-        self.lastVar    = self._getVar(self.name)
-        self.priorVar   = self._getVar(self.name+kPriorSuffix,   double_underscores=True)
-        self.changedVar = self._getVar(self.name+kChangedSuffix, double_underscores=True)
-        self.contextVar = self._getVar(self.name+kContextSuffix, double_underscores=True)
+        self.name        = namespace
+        self.actionName  = namespace
+        self.lastState   = lastState
+        self.priorState  = priorState
+        self.contexts    = contexts
+        self.folder      = self._getFolder()
+        self.lastVar     = self._getVar(self.name)
+        self.priorVar    = self._getVar(self.name+kPriorSuffix,   double_underscores=True)
+        self.changedVar  = self._getVar(self.name+kChangedSuffix, double_underscores=True)
+        self.contextVar  = self._getVar(self.name+kContextSuffix, double_underscores=True)
 
         self.branch     = StateBranch(self, lastState)
         self.actionList = list()
         self.variableDict = dict()
+
+    #-------------------------------------------------------------------------------
+    def stateRevert(self):
+        self.stateChange(self.priorState)
 
     #-------------------------------------------------------------------------------
     def stateChange(self, newState):
@@ -319,8 +327,8 @@ class StateTree(object):
             if newState == self.lastState:
                 self.logger.debug(u'>>> already in state "{}"'.format(self.name+kBaseChar+newState))
             else:
-                self.logger.info(u'>>> go to state "{}"'.format(self.name+kBaseChar+newState))
-                self.logger.debug(u'>>> prior state "{}"'.format(self.name+kBaseChar+self.lastState))
+                self.logger.info( u'>>> go to state "{}"'.format(self.name+kBaseChar+newState))
+                self.logger.debug(u'>>> from state  "{}"'.format(self.name+kBaseChar+self.lastState))
 
                 # global enter action group
                 self._setAction(kEnter)
@@ -341,17 +349,18 @@ class StateTree(object):
                 for leaf in newBranch.leaves[i:]:
                     leaf._setAction(kEnter)
 
-                # save new state and timestamp to variables
-                self._queueVariable(self.priorVar, self.lastState)
-                self._queueVariable(self.lastVar,  newState)
-                self._queueVariable(self.changedVar, indigo.server.getTime())
-
                 # global exit action group
                 self._setAction(kExit)
 
                 # save new state
                 self.branch = newBranch
+                self.priorState = self.lastState
                 self.lastState = newState
+
+                # save new state and timestamp to variables
+                self._queueVariable(self.priorVar, self.priorState)
+                self._queueVariable(self.lastVar,  self.lastState)
+                self._queueVariable(self.changedVar, indigo.server.getTime())
 
                 # make the change
                 self._executeActions()
@@ -430,17 +439,19 @@ class StateTree(object):
     #-------------------------------------------------------------------------------
     def _executeActions(self):
         self.logger.debug(u'>>> action groups:')
+        pad = max([len(action) for action in self.actionList]) + 1
+        indent = [u'    ',u''][self.plugin.logMissing]
         for action in self.actionList:
             try:
                 indigo.actionGroup.execute(action)
-                self.logger.debug(u'    {}: executed'.format(action))
+                self.logger.debug(u'{}{:<{}}: executed'.format(indent,action,pad))
                 self.sleep(self.plugin.actionSleep)
             except Exception as e:
                 if isinstance(e, ValueError) and e.message.startswith('ElementNotFoundError'):
                     if self.plugin.logMissing:
-                        self.logger.info(u'{}: missing'.format(action))
+                        self.logger.info(u'{:<{}}: missing'.format(action,pad))
                     else:
-                        self.logger.debug(u'    {}: missing'.format(action))
+                        self.logger.debug(u'    {:<{}}: missing'.format(action,pad))
                 else:
                     self.logger.error(u'{}: action group execute error \n{}'.format(self.name, e))
         self.actionList = list()
@@ -452,10 +463,11 @@ class StateTree(object):
     #-------------------------------------------------------------------------------
     def _changeVariables(self):
         self.logger.debug(u'>>> variables:')
+        pad = max([len(var.name) for var,value in self.variableDict.values()]) + 1
         for varId in self.variableDict:
             var, value = self.variableDict[varId]
             indigo.variable.updateValue(var.id, unicode(value))
-            self.logger.debug(u'    {}: {}'.format(var.name,value))
+            self.logger.debug(u'    {:<{}}: {}'.format(var.name,pad,value))
         self.variableDict = dict()
 
     #-------------------------------------------------------------------------------
