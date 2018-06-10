@@ -23,6 +23,7 @@ kExitChar       = "*"
 kVarSepChar     = "_"
 kBaseReserved   = (kBaseChar,kStateChar,kContextChar,kExitChar,kVarSepChar)
 kStateReserved  = (kBaseChar,kContextChar,kExitChar,kVarSepChar)
+kPriorSuffix    = "__PriorState"
 kChangedSuffix  = "__LastChange"
 kContextSuffix  = "__Contexts"
 kContextExtra   = "__Context__"
@@ -146,12 +147,22 @@ class Plugin(indigo.PluginBase):
                 errorsDict['contextName'] = "Context may not contain:  "+"  ".join(kBaseReserved)
             valuesDict['description'] = u"{} '{}' context '{}'".format([u"Add",u"Remove"][typeId=='removeContext'],baseName,contextName)
 
+        elif typeId == 'revertToPriorState':
+            var = self.treeDict[baseName].priorVar
+            if runtime:
+                if var.value == "":
+                    errorsDict['stateVarId'] = "State Name must be at least one character long"
+                elif any(ch in var.value for ch in kStateReserved):
+                    errorsDict['stateVarId'] = "State Name may not contain:  "+"  ".join(kStateReserved)
+            valuesDict['description'] = u"Revert '{}' to prior state".format(baseName)
+
         elif typeId == 'variableToState':
             varId = valuesDict.get('stateVarId',u"")
             if varId == "":
                 errorsDict['stateVarId'] = "No variable defined"
-            elif runtime:
+            else:
                 var = indigo.variables[int(varId)]
+            if runtime:
                 if var.value == "":
                     errorsDict['stateVarId'] = "State Name must be at least one character long"
                 elif any(ch in var.value for ch in kStateReserved):
@@ -181,6 +192,8 @@ class Plugin(indigo.PluginBase):
                 tree.stateChange(action.props['stateName'])
             elif action.pluginTypeId == 'variableToState':
                 tree.stateChange(indigo.variables[int(action.props['stateVarId'])].value)
+            elif action.pluginTypeId == 'revertToPriorState':
+                tree.stateChange(indigo.variables[tree.priorVar].value)
             elif action.pluginTypeId == 'addContext':
                 tree.contextChange(action.props['contextName'], True)
             elif action.pluginTypeId == 'removeContext':
@@ -289,6 +302,7 @@ class StateTree(object):
         self.contexts   = contexts
         self.folder     = self._getFolder()
         self.lastVar    = self._getVar(self.name)
+        self.priorVar   = self._getVar(self.name+kPriorSuffix,   double_underscores=True)
         self.changedVar = self._getVar(self.name+kChangedSuffix, double_underscores=True)
         self.contextVar = self._getVar(self.name+kContextSuffix, double_underscores=True)
 
@@ -300,7 +314,11 @@ class StateTree(object):
     def stateChange(self, newState):
         with self.lock:
 
-            if newState != self.lastState:
+            if not newState:
+                self.logger.error(u'>>> no state defined "{}"'.format(self.name+kBaseChar+newState))
+            if newState == self.lastState:
+                self.logger.debug(u'>>> already in state "{}"'.format(self.name+kBaseChar+newState))
+            else:
                 self.logger.info(u'>>> go to state "{}"'.format(self.name+kBaseChar+newState))
                 self.logger.debug(u'>>> prior state "{}"'.format(self.name+kBaseChar+self.lastState))
 
@@ -324,7 +342,8 @@ class StateTree(object):
                     leaf._setAction(kEnter)
 
                 # save new state and timestamp to variables
-                self._queueVariable(self.lastVar, newState)
+                self._queueVariable(self.priorVar, self.lastState)
+                self._queueVariable(self.lastVar,  newState)
                 self._queueVariable(self.changedVar, indigo.server.getTime())
 
                 # global exit action group
@@ -337,9 +356,6 @@ class StateTree(object):
                 # make the change
                 self._executeActions()
                 self._changeVariables()
-
-            else:
-                self.logger.debug(u'>>> already in state "{}"'.format(self.name+kBaseChar+newState))
 
     #-------------------------------------------------------------------------------
     def contextChange(self, context, enterExitBool):

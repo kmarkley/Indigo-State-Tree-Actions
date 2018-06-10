@@ -30,6 +30,16 @@
 			</Field>
 		</ConfigUI>
 	</Action>
+	<Action id="revertToPriorState">
+		<Name>Revert To Prior State</Name>
+		<CallbackMethod>doStateTreeAction</CallbackMethod>
+		<ConfigUI>
+			<Field id="baseName" type="menu">
+				<Label>Base Name:</Label>
+                <List class="self" method="listNamespaces"/>
+			</Field>
+		</ConfigUI>
+	</Action>
 	<Action id="addContext">
 		<Name>Add Context</Name>
 		<CallbackMethod>doStateTreeAction</CallbackMethod>
