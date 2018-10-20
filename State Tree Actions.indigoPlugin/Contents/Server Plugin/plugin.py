@@ -134,13 +134,15 @@ class Plugin(indigo.PluginBase):
         elif baseName not in self.treeDict:
             errorsDict['baseName'] = "Namespace '{}' does not exist".format(baseName)
 
+        force = valuesDict.get('force',False)
+
         if typeId == 'enterNewState':
             stateName = valuesDict.get('stateName',u"")
             if stateName == "":
                 errorsDict['stateName'] = "State Name must be at least one character long"
             elif any(ch in stateName for ch in kStateReserved):
                 errorsDict['stateName'] = "State Name may not contain:  "+"  ".join(kStateReserved)
-            valuesDict['description'] = u"Enter '{}' state '{}'".format(baseName,stateName)
+            valuesDict['description'] = u"{}enter '{}' state '{}'".format(['','force '][force],baseName,stateName)
 
         elif typeId in ('addContext','removeContext'):
             contextName = valuesDict.get('contextName',u"")
@@ -148,7 +150,7 @@ class Plugin(indigo.PluginBase):
                 errorsDict['contextName'] = "Context must be at least one character long"
             elif any(ch in contextName for ch in kBaseReserved):
                 errorsDict['contextName'] = "Context may not contain:  "+"  ".join(kBaseReserved)
-            valuesDict['description'] = u"{} '{}' context '{}'".format([u"Add",u"Remove"][typeId=='removeContext'],baseName,contextName)
+            valuesDict['description'] = u"{}{} '{}' context '{}'".format(['','force '][force], [u"add",u"remove"][typeId=='removeContext'],baseName,contextName)
 
         elif typeId == 'revertToPriorState':
             var = self.treeDict[baseName].priorVar
@@ -157,7 +159,7 @@ class Plugin(indigo.PluginBase):
                     errorsDict['stateVarId'] = "State Name must be at least one character long"
                 elif any(ch in var.value for ch in kStateReserved):
                     errorsDict['stateVarId'] = "State Name may not contain:  "+"  ".join(kStateReserved)
-            valuesDict['description'] = u"Revert '{}' to prior state".format(baseName)
+            valuesDict['description'] = u"revert '{}' to prior state".format(baseName)
 
         elif typeId == 'variableToState':
             varId = valuesDict.get('stateVarId',u"")
@@ -170,7 +172,7 @@ class Plugin(indigo.PluginBase):
                     errorsDict['stateVarId'] = "State Name must be at least one character long"
                 elif any(ch in var.value for ch in kStateReserved):
                     errorsDict['stateVarId'] = "State Name may not contain:  "+"  ".join(kStateReserved)
-            valuesDict['description'] = u"Enter '{}' state from variable '{}'".format(baseName,var.name)
+            valuesDict['description'] = u"{}enter '{}' state from variable '{}'".format(['','force '][force],baseName,var.name)
 
         if len(errorsDict) > 0:
             return (False, valuesDict, errorsDict)
@@ -192,15 +194,15 @@ class Plugin(indigo.PluginBase):
         if self._validateRuntime(action, action.pluginTypeId):
             tree = self.treeDict[action.props['baseName']]
             if action.pluginTypeId == 'enterNewState':
-                tree.stateChange(action.props['stateName'])
+                tree.stateChange(action.props['stateName'], action.props.get('force',False))
             elif action.pluginTypeId == 'variableToState':
-                tree.stateChange(indigo.variables[int(action.props['stateVarId'])].value)
+                tree.stateChange(indigo.variables[int(action.props['stateVarId'])].value, action.props.get('force',False))
             elif action.pluginTypeId == 'revertToPriorState':
                 tree.stateRevert()
             elif action.pluginTypeId == 'addContext':
-                tree.contextChange(action.props['contextName'], True)
+                tree.contextChange(action.props['contextName'], True, action.props.get('force',False))
             elif action.pluginTypeId == 'removeContext':
-                tree.contextChange(action.props['contextName'], False)
+                tree.contextChange(action.props['contextName'], False, action.props.get('force',False))
             else:
                 self.logger.error(u'Action not recognized: {}'.format(action.pluginTypeId))
             self.saveNamespaceStates()
@@ -319,22 +321,24 @@ class StateTree(object):
         self.stateChange(self.priorState)
 
     #-------------------------------------------------------------------------------
-    def stateChange(self, newState):
+    def stateChange(self, newState, force=False):
         with self.lock:
 
             if not newState:
                 self.logger.error(u'>>> no state defined "{}"'.format(self.name+kBaseChar+newState))
-            if newState == self.lastState:
+
+            elif (not force) and (newState == self.lastState):
                 self.logger.debug(u'>>> already in state "{}"'.format(self.name+kBaseChar+newState))
+
             else:
                 self.logger.info( u'>>> go to state "{}"'.format(self.name+kBaseChar+newState))
                 self.logger.debug(u'>>> from state  "{}"'.format(self.name+kBaseChar+self.lastState))
 
+                oldBranch = [self.branch,StateBranch(self,"")][force]
+                newBranch  = StateBranch(self, newState)
+
                 # global enter action group
                 self._setAction(kEnter)
-
-                oldBranch  = self.branch
-                newBranch  = StateBranch(self, newState)
 
                 # back out old branch until it matches new branch
                 leafnames = list(leaf.name for leaf in newBranch.leaves)
@@ -367,16 +371,17 @@ class StateTree(object):
                 self._changeVariables()
 
     #-------------------------------------------------------------------------------
-    def contextChange(self, context, enterExitBool):
+    def contextChange(self, context, enterExitBool, force=False):
         with self.lock:
 
-            if [(context in self.contexts),(context not in self.contexts)][enterExitBool]:
+            if force or [(context in self.contexts),(context not in self.contexts)][enterExitBool]:
                 self.logger.info(u'>>> {} context "{}"'.format(['remove','add'][enterExitBool], self.name+kContextChar+context))
 
                 # execute global add context action group
                 if enterExitBool == kEnter:
                     self._setContext(context, kEnter)
-                    self.contexts.append(context)
+                    if context not in self.contexts:
+                        self.contexts.append(context)
 
                 # execute context action group for each nested state
                 incr = [-1,1][enterExitBool]
@@ -386,7 +391,8 @@ class StateTree(object):
                 # execute global remove context action group
                 if enterExitBool == kExit:
                     self._setContext(context, kExit)
-                    self.contexts.remove(context)
+                    if context in self.contexts:
+                        self.contexts.remove(context)
 
                 # save changes
                 self._queueVariable(self._getVar(self.name + kContextExtra + context, double_underscores=True), enterExitBool)

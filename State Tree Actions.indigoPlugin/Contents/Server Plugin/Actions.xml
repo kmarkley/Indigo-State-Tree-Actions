@@ -14,6 +14,15 @@
 			<Field id="enterNewStateValueLabel" type="label" fontColor="darkgray" fontSize="small" alignWithControl="true">
 				<Label>The name of the new state.  Must follow naming conventions.</Label>
 			</Field>
+			<Field id="force" type="checkbox" defaultValue="false">
+				<Label>Force:</Label>
+			</Field>
+			<Field id="forceFalseHelp" type="label" visibleBindingId="force" visibleBindingValue="false" fontColor="darkgray" fontSize="small" alignWithControl="true">
+				<Label>Do nothing if already in specified state</Label>
+			</Field>
+			<Field id="forceTrueHelp" type="label" visibleBindingId="force" visibleBindingValue="true" fontColor="darkgray" fontSize="small" alignWithControl="true">
+				<Label>Re-execute actions if already in specified state</Label>
+			</Field>
 		</ConfigUI>
 	</Action>
 	<Action id="variableToState">
@@ -27,6 +36,15 @@
 			<Field id="stateVarId" type="menu">
 				<Label>Variable:</Label>
                 <List class="indigo.variables"/>
+			</Field>
+			<Field id="force" type="checkbox" defaultValue="false">
+				<Label>Force:</Label>
+			</Field>
+			<Field id="forceFalseHelp" type="label" visibleBindingId="force" visibleBindingValue="false" fontColor="darkgray" fontSize="small" alignWithControl="true">
+				<Label>Do nothing if already in specified state</Label>
+			</Field>
+			<Field id="forceTrueHelp" type="label" visibleBindingId="force" visibleBindingValue="true" fontColor="darkgray" fontSize="small" alignWithControl="true">
+				<Label>Re-execute actions if already in specified state</Label>
 			</Field>
 		</ConfigUI>
 	</Action>
@@ -51,6 +69,15 @@
 			<Field id="contextName" type="textfield">
 				<Label>Context to add:</Label>
 			</Field>
+			<Field id="force" type="checkbox" defaultValue="false">
+				<Label>Force:</Label>
+			</Field>
+			<Field id="forceFalseHelp" type="label" visibleBindingId="force" visibleBindingValue="false" fontColor="darkgray" fontSize="small" alignWithControl="true">
+				<Label>Do nothing if specified context is already true</Label>
+			</Field>
+			<Field id="forceTrueHelp" type="label" visibleBindingId="force" visibleBindingValue="true" fontColor="darkgray" fontSize="small" alignWithControl="true">
+				<Label>Re-execute actions if specified context is already true</Label>
+			</Field>
 		</ConfigUI>
 	</Action>
 	<Action id="removeContext">
@@ -63,6 +90,15 @@
 			</Field>
 			<Field id="contextName" type="textfield">
 				<Label>Context to remove:</Label>
+			</Field>
+			<Field id="force" type="checkbox" defaultValue="false">
+				<Label>Force:</Label>
+			</Field>
+			<Field id="forceFalseHelp" type="label" visibleBindingId="force" visibleBindingValue="false" fontColor="darkgray" fontSize="small" alignWithControl="true">
+				<Label>Do nothing if specified context is already false</Label>
+			</Field>
+			<Field id="forceTrueHelp" type="label" visibleBindingId="force" visibleBindingValue="true" fontColor="darkgray" fontSize="small" alignWithControl="true">
+				<Label>Re-execute actions if specified context is already false</Label>
 			</Field>
 		</ConfigUI>
 	</Action>
