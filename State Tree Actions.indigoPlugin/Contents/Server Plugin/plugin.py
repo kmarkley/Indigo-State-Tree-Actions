@@ -326,49 +326,55 @@ class StateTree(object):
 
             if not newState:
                 self.logger.error(u'>>> no state defined "{}"'.format(self.name+kBaseChar+newState))
+                return
 
-            elif (not force) and (newState == self.lastState):
-                self.logger.debug(u'>>> already in state "{}"'.format(self.name+kBaseChar+newState))
+            elif newState == self.lastState:
+                if force:
+                    oldBranch = StateBranch(self,"")
+                else:
+                    self.logger.debug(u'>>> already in state "{}"'.format(self.name+kBaseChar+newState))
+                    return
 
             else:
-                self.logger.info( u'>>> go to state "{}"'.format(self.name+kBaseChar+newState))
-                self.logger.debug(u'>>> from state  "{}"'.format(self.name+kBaseChar+self.lastState))
+                oldBranch = self.branch
 
-                oldBranch = [self.branch,StateBranch(self,"")][force]
-                newBranch  = StateBranch(self, newState)
+            self.logger.info( u'>>> go to state "{}"'.format(self.name+kBaseChar+newState))
+            self.logger.debug(u'>>> from state  "{}"'.format(self.name+kBaseChar+self.lastState))
 
-                # global enter action group
-                self._setAction(kEnter)
+            newBranch  = StateBranch(self, newState)
 
-                # back out old branch until it matches new branch
-                leafnames = list(leaf.name for leaf in newBranch.leaves)
-                for i, leaf in reversed(list(enumerate(oldBranch.leaves))):
-                    if leaf.name in leafnames:
-                        i += 1
-                        break
-                    leaf._setAction(kExit)
-                else: i = 0   # if oldBranch is empty, i won't initialize
+            # global enter action group
+            self._setAction(kEnter)
 
-                # enter new branch from matching point
-                for leaf in newBranch.leaves[i:]:
-                    leaf._setAction(kEnter)
+            # back out old branch until it matches new branch
+            leafnames = list(leaf.name for leaf in newBranch.leaves)
+            for i, leaf in reversed(list(enumerate(oldBranch.leaves))):
+                if leaf.name in leafnames:
+                    i += 1
+                    break
+                leaf._setAction(kExit)
+            else: i = 0   # if oldBranch is empty, i won't initialize
 
-                # global exit action group
-                self._setAction(kExit)
+            # enter new branch from matching point
+            for leaf in newBranch.leaves[i:]:
+                leaf._setAction(kEnter)
 
-                # save new state
-                self.branch = newBranch
-                self.priorState = self.lastState
-                self.lastState = newState
+            # global exit action group
+            self._setAction(kExit)
 
-                # save new state and timestamp to variables
-                self._queueVariable(self.priorVar, self.priorState)
-                self._queueVariable(self.lastVar,  self.lastState)
-                self._queueVariable(self.changedVar, indigo.server.getTime())
+            # save new state
+            self.branch = newBranch
+            self.priorState = self.lastState
+            self.lastState = newState
 
-                # make the change
-                self._executeActions()
-                self._changeVariables()
+            # save new state and timestamp to variables
+            self._queueVariable(self.priorVar, self.priorState)
+            self._queueVariable(self.lastVar,  self.lastState)
+            self._queueVariable(self.changedVar, indigo.server.getTime())
+
+            # make the change
+            self._executeActions()
+            self._changeVariables()
 
     #-------------------------------------------------------------------------------
     def contextChange(self, context, enterExitBool, force=False):
