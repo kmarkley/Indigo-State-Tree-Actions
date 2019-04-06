@@ -8,7 +8,6 @@ import indigo
 import threading
 import time
 from itertools import groupby
-from ghpu import GitHubPluginUpdater
 
 # Note the "indigo" module is automatically imported and made available inside
 # our global name space by the host process.
@@ -31,15 +30,12 @@ kContextExtra   = "__Context__"
 kEnter   = True
 kExit    = False
 
-k_updateCheckHours = 24
-
 ################################################################################
 class Plugin(indigo.PluginBase):
 
     #-------------------------------------------------------------------------------
     def __init__(self, pluginId, pluginDisplayName, pluginVersion, pluginPrefs):
         indigo.PluginBase.__init__(self, pluginId, pluginDisplayName, pluginVersion, pluginPrefs)
-        self.updater = GitHubPluginUpdater(self)
 
     #-------------------------------------------------------------------------------
     def __del__(self):
@@ -49,7 +45,6 @@ class Plugin(indigo.PluginBase):
     # Start, Stop, Plugin Prefs
     #-------------------------------------------------------------------------------
     def startup(self):
-        self.nextCheck   = self.pluginPrefs.get('nextUpdateCheck',0)
         self.logMissing  = self.pluginPrefs.get("logMissing", False)
         self.actionSleep = float(self.pluginPrefs.get("actionSleep",0))
         self.debug       = self.pluginPrefs.get("showDebugInfo",False)
@@ -72,21 +67,10 @@ class Plugin(indigo.PluginBase):
         self.savePluginPrefs()
 
     #-------------------------------------------------------------------------------
-    def runConcurrentThread(self):
-        try:
-            while True:
-                if time.time() > self.nextCheck:
-                    self.checkForUpdates()
-                self.sleep(600)
-        except self.StopThread:
-            pass
-
-    #-------------------------------------------------------------------------------
     def savePluginPrefs(self):
         self.pluginPrefs['showDebugInfo']   = self.debug
         self.pluginPrefs['logMissing']      = self.logMissing
         self.pluginPrefs['actionSleep']     = self.actionSleep
-        self.pluginPrefs['nextUpdateCheck'] = self.nextCheck
 
         indigo.server.savePluginPrefs()
 
@@ -209,28 +193,6 @@ class Plugin(indigo.PluginBase):
 
     #-------------------------------------------------------------------------------
     # Menu Methods
-    #-------------------------------------------------------------------------------
-    def checkForUpdates(self):
-        try:
-            self.updater.checkForUpdate()
-        except Exception as e:
-            msg = 'Check for update error.  Next attempt in {} hours.'.format(k_updateCheckHours)
-            if self.debug:
-                self.logger.exception(msg)
-            else:
-                self.logger.error(msg)
-                self.logger.debug(e)
-        self.nextCheck = time.time() + k_updateCheckHours*60*60
-        self.savePluginPrefs()
-
-    #-------------------------------------------------------------------------------
-    def updatePlugin(self):
-        self.updater.update()
-
-    #-------------------------------------------------------------------------------
-    def forceUpdate(self):
-        self.updater.update(currentVersion='0.0.0')
-
     #-------------------------------------------------------------------------------
     def changeNamespace(self, valuesDict="", typeId=""):
         errorText = ""
