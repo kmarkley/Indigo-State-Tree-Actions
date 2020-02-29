@@ -1,47 +1,94 @@
-<?xml version="1.0"?>
+<?xml version='1.0'?>
 <MenuItems>
-	<MenuItem id="addNamespace">
+	<MenuItem id='addNamespace'>
 		<Name>Add Namespace</Name>
 		<CallbackMethod>changeNamespace</CallbackMethod>
 		<ConfigUI>
-			<Field id="baseName" type="textfield">
+			<Field id='baseName' type='textfield'>
 				<Label>Base Name:</Label>
 			</Field>
-			<Field id="baseLabel" type="label" fontColor="darkgray" fontSize="small" alignWithControl="true">
+			<Field id='baseLabel' type='label' fontColor='darkgray' fontSize='small' alignWithControl='true'>
 				<Label>The Base Name of the state tree.</Label>
 			</Field>
 		</ConfigUI>
 	</MenuItem>
-	<MenuItem id="removeNamespace">
+	<MenuItem id='removeNamespace'>
 		<Name>Remove Namespace</Name>
 		<CallbackMethod>changeNamespace</CallbackMethod>
 		<ConfigUI>
-			<Field id="baseName" type="menu">
+			<Field id='baseName' type='menu'>
 				<Label>Base Name:</Label>
-                <List class="self" method="listNamespaces"/>
+                <List class='self' method='listNamespaces'/>
 			</Field>
-			<Field id="baseLabel" type="label" fontColor="darkgray" fontSize="small" alignWithControl="true">
+			<Field id='baseLabel' type='label' fontColor='darkgray' fontSize='small' alignWithControl='true'>
 				<Label>Removing a namespace will not delete anything.  It will cause existing actions to fail validation.</Label>
 			</Field>
 		</ConfigUI>
 	</MenuItem>
+	<MenuItem id='contextGroupSeperator' type='separator' />
+	<MenuItem id='addContextGroup'>
+		<Name>Add Context Group</Name>
+		<CallbackMethod>changeContextGroup</CallbackMethod>
+		<ConfigUI>
+			<Field id='baseName' type='menu'>
+				<Label>Base Name:</Label>
+                <List class='self' method='listNamespaces'/>
+			</Field>
+			<Field id='groupName' type='textfield'>
+				<Label>Group Name:</Label>
+			</Field>
+			<Field id='groupString' type='textfield'>
+				<Label>Group Items:</Label>
+			</Field>
+			<Field id='groupLabel' type='label' fontColor='darkgray' fontSize='small' alignWithControl='true'>
+				<Label>List contexts for this group separated by a comma.</Label>
+			</Field>
+		</ConfigUI>
+	</MenuItem>
+	<MenuItem id='removeContextGroup'>
+		<Name>Remove Context Group</Name>
+		<CallbackMethod>changeContextGroup</CallbackMethod>
+		<ConfigUI>
+			<Field id='baseName' type='menu'>
+				<Label>Base Name:</Label>
+                <List class='self' method='listNamespaces'/>
+				<CallbackMethod>updateContextGroup</CallbackMethod>
+			</Field>
+			<Field id='showGroupName' type='checkbox' defaultValue='false' hidden='true' />
+			<Field id='groupName' type='menu' visibleBindingId='showGroupName' visibleBindingValue='true' alwaysUseInDialogHeightCalc='true'>
+				<Label>Context Group:</Label>
+                <List class='self' method='listContextGroups' dynamicReload='true'/>
+			</Field>
+		</ConfigUI>
+	</MenuItem>
+	<MenuItem id='logContextGroups'>
+		<Name>Log Context Groups</Name>
+		<CallbackMethod>logContextGroups</CallbackMethod>
+		<ConfigUI>
+			<Field id='baseName' type='menu'>
+				<Label>Base Name:</Label>
+                <List class='self' method='listNamespaces'/>
+			</Field>
+		</ConfigUI>
+	</MenuItem>
+	<MenuItem id='syncVariablesSeperator' type='separator' />
 	<MenuItem id='syncVariables'>
         <Name>Sync Variables</Name>
 		<CallbackMethod>syncVariables</CallbackMethod>
 		<ConfigUI>
-			<Field id="baseName" type="menu">
+			<Field id='baseName' type='menu'>
 				<Label>Base Name:</Label>
-                <List class="self" method="listNamespaces"/>
+                <List class='self' method='listNamespaces'/>
 			</Field>
-			<Field id="syncLabel1" type="label" alignWithControl="true">
+			<Field id='syncLabel1' type='label' alignWithControl='true'>
 				<Label>All variables in the namespace folder will be affected</Label>
 			</Field>
-			<Field id="syncLabel2" type="label" alignWithControl="true">
+			<Field id='syncLabel2' type='label' alignWithControl='true'>
 				<Label>  -- including any you placed there manually!!</Label>
 			</Field>
 		</ConfigUI>
 	</MenuItem>
-    <MenuItem id="debugSeperator" type="separator" />
+    <MenuItem id='debugSeperator' type='separator' />
 	<MenuItem id='toggleLogMissing'>
         <Name>Toggle Log Missing Action Groups</Name>
 		<CallbackMethod>toggleLogMissing</CallbackMethod>

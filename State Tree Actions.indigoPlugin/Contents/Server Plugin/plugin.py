@@ -7,6 +7,7 @@
 import indigo
 import threading
 import time
+import json
 from itertools import groupby
 
 # Note the "indigo" module is automatically imported and made available inside
@@ -20,8 +21,9 @@ kStateChar      = ">"
 kContextChar    = "+"
 kExitChar       = "*"
 kVarSepChar     = "_"
-kBaseReserved   = (kBaseChar,kStateChar,kContextChar,kExitChar,kVarSepChar)
-kStateReserved  = (kBaseChar,kContextChar,kExitChar,kVarSepChar)
+kGroupSepChar   = ","
+kBaseReserved   = (kBaseChar,kStateChar,kContextChar,kExitChar,kVarSepChar,kGroupSepChar)
+kStateReserved  = (kBaseChar,kContextChar,kExitChar,kVarSepChar,kGroupSepChar)
 kPriorSuffix    = "__PriorState"
 kChangedSuffix  = "__LastChange"
 kContextSuffix  = "__Contexts"
@@ -55,11 +57,13 @@ class Plugin(indigo.PluginBase):
         lastStateDict  = self.pluginPrefs.get('lastStateDict',dict())
         priorStateDict = self.pluginPrefs.get('priorStateDict',dict())
         contextDict    = self.pluginPrefs.get('contextDict',dict())
+        groupsDict     = self.pluginPrefs.get('groupsDict',dict())
         self.treeDict  = {namespace:StateTree(self,
                                               namespace  = namespace,
                                               lastState  = lastStateDict.get(namespace,u''),
                                               priorState = priorStateDict.get(namespace,u''),
-                                              contexts   = list(contextDict.get(namespace,[]))
+                                              contexts   = list(contextDict.get(namespace,[])),
+                                              groups     = json.loads(groupsDict.get(namespace,'{}'))
                                               ) for namespace in lastStateDict}
 
     #-------------------------------------------------------------------------------
@@ -79,6 +83,7 @@ class Plugin(indigo.PluginBase):
         self.pluginPrefs['lastStateDict']  = {name:tree.lastState  for name,tree in self.treeDict.items()}
         self.pluginPrefs['priorStateDict'] = {name:tree.priorState for name,tree in self.treeDict.items()}
         self.pluginPrefs['contextDict']    = {name:tree.contexts   for name,tree in self.treeDict.items()}
+        self.pluginPrefs['groupsDict']     = {name:json.dumps(tree.groups)     for name,tree in self.treeDict.items()}
 
         indigo.server.savePluginPrefs()
 
@@ -223,6 +228,44 @@ class Plugin(indigo.PluginBase):
             return (True, valuesDict)
 
     #-------------------------------------------------------------------------------
+    def changeContextGroup(self, valuesDict="", typeId=""):
+        errorsDict = indigo.Dict()
+        baseName = valuesDict.get('baseName',"")
+        groupName = valuesDict.get('groupName',"")
+        if baseName == "":
+            errorsDict['baseName'] = "Required"
+        elif groupName == "":
+            errorsDict['groupName'] = "Required"
+        elif typeId == 'addContextGroup':
+            if valuesDict.get('groupString',"") == "":
+                errorsDict['groupString'] = "Required"
+
+        if errorsDict:
+            return (False, valuesDict, errorsDict)
+        else:
+            tree = self.treeDict[baseName]
+            if typeId == 'addContextGroup':
+                tree.groups[groupName] = list(set(item.strip() for item in valuesDict['groupString'].split(',')))
+                self.logger.info(u'>>> context group "{}" added to "{}" namespace'.format(groupName, baseName))
+            elif typeId == 'removeContextGroup':
+                del tree.groups[groupName]
+                self.logger.info(u'>>> context group "{}" removed from "{}" namespace'.format(groupName, baseName))
+            self.saveNamespaceStates()
+            return (True, valuesDict)
+
+    #-------------------------------------------------------------------------------
+    def logContextGroups(self, valuesDict="", typeId=""):
+        baseName = valuesDict.get('baseName',"")
+        if baseName == "":
+            return (False, valuesDict, indigo.Dict({'baseName':"Required"}))
+        else:
+            tree = self.treeDict[baseName]
+            self.logger.info(u'Context Groups for "{}" namespace:'.format(baseName))
+            for key, value in tree.groups.items():
+                self.logger.info(u'    {}: {}'.format(key, value))
+            return (True, valuesDict)
+
+    #-------------------------------------------------------------------------------
     def syncVariables(self, valuesDict="", typeId=""):
         if valuesDict.get('baseName',u""):
             self.treeDict[valuesDict['baseName']].syncVariables()
@@ -250,13 +293,27 @@ class Plugin(indigo.PluginBase):
     def listNamespaces(self, filter="", valuesDict=None, typeId="", targetId=0):
         return [(namespace,namespace) for namespace in self.treeDict]
 
+    #-------------------------------------------------------------------------------
+    def updateContextGroup(self, valuesDict=None, typeId='', targetId=0):
+        valuesDict['showGroupName'] = 'true'
+        return valuesDict
+
+    #-------------------------------------------------------------------------------
+    def listContextGroups(self, filter=None, valuesDict=dict(), typeId='', targetId=0):
+        baseName = valuesDict.get('baseName',"")
+        if baseName:
+            tree = self.treeDict[baseName]
+            return [(groupName,groupName) for groupName in tree.groups.keys()]
+        else:
+            return [("0","")]
+
 ################################################################################
 # Classes
 ################################################################################
 class StateTree(object):
 
     #-------------------------------------------------------------------------------
-    def __init__(self, plugin, namespace, lastState=u"", priorState=u"", contexts=list()):
+    def __init__(self, plugin, namespace, lastState=u"", priorState=u"", contexts=list(), groups=dict()):
         self.plugin      = plugin
         self.logger      = plugin.logger
         self.sleep       = plugin.sleep
@@ -268,6 +325,7 @@ class StateTree(object):
         self.lastState   = lastState
         self.priorState  = priorState
         self.contexts    = contexts
+        self.groups      = groups
         self.folder      = self._getFolder()
         self.lastVar     = self._getVar(self.name)
         self.priorVar    = self._getVar(self.name+kPriorSuffix,   double_underscores=True)
@@ -340,10 +398,19 @@ class StateTree(object):
 
     #-------------------------------------------------------------------------------
     def contextChange(self, context, enterExitBool, force=False):
-        with self.lock:
 
-            if force or [(context in self.contexts),(context not in self.contexts)][enterExitBool]:
-                self.logger.info(u'>>> {} context "{}"'.format(['remove','add'][enterExitBool], self.name+kContextChar+context))
+        if force or [(context in self.contexts),(context not in self.contexts)][enterExitBool]:
+
+            # exit other contexts in shared context groups
+            if enterExitBool == kEnter:
+                for group in self.groups.values():
+                    if context in group:
+                        for item in group:
+                            if item != context:
+                                self.contextChange(item, kExit, force)
+
+            self.logger.info(u'>>> {} context "{}"'.format(['remove','add'][enterExitBool], self.name+kContextChar+context))
+            with self.lock:
 
                 # execute global add context action group
                 if enterExitBool == kEnter:
@@ -370,8 +437,8 @@ class StateTree(object):
                 self._executeActions()
                 self._changeVariables()
 
-            else:
-                self.logger.debug(u'>>> context "{}" already {}'.format(self.name+kContextChar+context, ['removed','added'][enterExitBool]))
+        else:
+            self.logger.debug(u'>>> context "{}" already {}'.format(self.name+kContextChar+context, ['removed','added'][enterExitBool]))
 
     #-------------------------------------------------------------------------------
     def syncVariables(self):
@@ -421,11 +488,14 @@ class StateTree(object):
                 self.logger.debug(u'{}{:<{}}: executed'.format(indent,action,pad))
                 self.sleep(self.plugin.actionSleep)
             except Exception as e:
-                if isinstance(e, ValueError) and e.message.startswith('ElementNotFoundError'):
+                # temporary until indigo is fixed
+                if True:
+                #if isinstance(e, ValueError) and e.message.startswith('ElementNotFoundError'):
+                #
                     if self.plugin.logMissing:
                         self.logger.info(u'{:<{}}: missing'.format(action,pad))
                     else:
-                        self.logger.debug(u'    {:<{}}: missing'.format(action,pad))
+                        self.logger.debug(u'{}{:<{}}: missing'.format(indent,action,pad))
                 else:
                     self.logger.error(u'{}: action group execute error \n{}'.format(self.name, e))
         self.actionList = list()
