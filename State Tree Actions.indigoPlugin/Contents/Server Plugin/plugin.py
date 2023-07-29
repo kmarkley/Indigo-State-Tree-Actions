@@ -51,7 +51,7 @@ class Plugin(indigo.PluginBase):
         self.actionSleep = float(self.pluginPrefs.get("actionSleep",0))
         self.debug       = self.pluginPrefs.get("showDebugInfo",False)
         if self.debug:
-            self.logger.debug(u'Debug logging enabled')
+            self.logger.debug('Debug logging enabled')
         self.debug = self.pluginPrefs.get("showDebugInfo",False)
 
         lastStateDict  = self.pluginPrefs.get('lastStateDict',dict())
@@ -60,8 +60,8 @@ class Plugin(indigo.PluginBase):
         groupsDict     = self.pluginPrefs.get('groupsDict',dict())
         self.treeDict  = {namespace:StateTree(self,
                                               namespace  = namespace,
-                                              lastState  = lastStateDict.get(namespace,u''),
-                                              priorState = priorStateDict.get(namespace,u''),
+                                              lastState  = lastStateDict.get(namespace,''),
+                                              priorState = priorStateDict.get(namespace,''),
                                               contexts   = list(contextDict.get(namespace,[])),
                                               groups     = json.loads(groupsDict.get(namespace,'{}'))
                                               ) for namespace in lastStateDict}
@@ -96,7 +96,7 @@ class Plugin(indigo.PluginBase):
             self.logMissing = valuesDict.get('logMissing',False)
             self.actionSleep = float(valuesDict.get('actionSleep',0))
 
-            self.logger.debug(u'Debug logging {}'.format(['disabled','enabled'][self.debug]))
+            self.logger.debug(f"Debug logging {['disabled','enabled'][self.debug]}")
 
     #-------------------------------------------------------------------------------
     def validatePrefsConfigUi(self, valuesDict):
@@ -117,29 +117,29 @@ class Plugin(indigo.PluginBase):
     def validateActionConfigUi(self, valuesDict, typeId, devId, runtime=False):
         errorsDict = indigo.Dict()
 
-        baseName = valuesDict.get('baseName',u"")
+        baseName = valuesDict.get('baseName',"")
         if baseName == "":
             errorsDict['baseName'] = "Base Name required"
         elif baseName not in self.treeDict:
-            errorsDict['baseName'] = "Namespace '{}' does not exist".format(baseName)
+            errorsDict['baseName'] = f"Namespace '{baseName}' does not exist"
 
         force = valuesDict.get('force',False)
 
         if typeId == 'enterNewState':
-            stateName = valuesDict.get('stateName',u"")
+            stateName = valuesDict.get('stateName',"")
             if stateName == "":
                 errorsDict['stateName'] = "State Name must be at least one character long"
             elif any(ch in stateName for ch in kStateReserved):
                 errorsDict['stateName'] = "State Name may not contain:  "+"  ".join(kStateReserved)
-            valuesDict['description'] = u"{}enter '{}' state '{}'".format(['','force '][force],baseName,stateName)
+            valuesDict['description'] = f"{['','force '][force]}enter '{baseName}' state '{stateName}'"
 
         elif typeId in ('addContext','removeContext'):
-            contextName = valuesDict.get('contextName',u"")
+            contextName = valuesDict.get('contextName',"")
             if contextName == "":
                 errorsDict['contextName'] = "Context must be at least one character long"
             elif any(ch in contextName for ch in kBaseReserved):
                 errorsDict['contextName'] = "Context may not contain:  "+"  ".join(kBaseReserved)
-            valuesDict['description'] = u"{}{} '{}' context '{}'".format(['','force '][force], [u"add",u"remove"][typeId=='removeContext'],baseName,contextName)
+            valuesDict['description'] = f"{['','force '][force]}{['add','remove'][typeId=='removeContext']} '{baseName}' context '{contextName}'"
 
         elif typeId == 'revertToPriorState':
             var = self.treeDict[baseName].priorVar
@@ -148,10 +148,10 @@ class Plugin(indigo.PluginBase):
                     errorsDict['stateVarId'] = "State Name must be at least one character long"
                 elif any(ch in var.value for ch in kStateReserved):
                     errorsDict['stateVarId'] = "State Name may not contain:  "+"  ".join(kStateReserved)
-            valuesDict['description'] = u"revert '{}' to prior state".format(baseName)
+            valuesDict['description'] = f"revert '{baseName}' to prior state"
 
         elif typeId == 'variableToState':
-            varId = valuesDict.get('stateVarId',u"")
+            varId = valuesDict.get('stateVarId',"")
             if varId == "":
                 errorsDict['stateVarId'] = "No variable defined"
             else:
@@ -161,7 +161,7 @@ class Plugin(indigo.PluginBase):
                     errorsDict['stateVarId'] = "State Name must be at least one character long"
                 elif any(ch in var.value for ch in kStateReserved):
                     errorsDict['stateVarId'] = "State Name may not contain:  "+"  ".join(kStateReserved)
-            valuesDict['description'] = u"{}enter '{}' state from variable '{}'".format(['','force '][force],baseName,var.name)
+            valuesDict['description'] = f"{['','force '][force]}enter '{baseName}' state from variable '{var.name}'"
 
         if len(errorsDict) > 0:
             return (False, valuesDict, errorsDict)
@@ -171,9 +171,9 @@ class Plugin(indigo.PluginBase):
     def _validateRuntime(self, action, typeId):
         valid = self.validateActionConfigUi(action.props, typeId, action.deviceId, runtime=True)
         if not valid[0]:
-            self.logger.error(u'Action "{}" failed validation'.format(typeId))
+            self.logger.error('Action "{typeId}" failed validation')
             for key in valid[2]:
-                self.logger.error(u'{}: {}'.format(key, valid[2][key]))
+                self.logger.error(f'{key}: {valid[2][key]}')
         return valid[0]
 
     #-------------------------------------------------------------------------------
@@ -192,8 +192,10 @@ class Plugin(indigo.PluginBase):
                 tree.contextChange(action.props['contextName'], True, action.props.get('force',False))
             elif action.pluginTypeId == 'removeContext':
                 tree.contextChange(action.props['contextName'], False, action.props.get('force',False))
+            elif action.pluginTypeId == 'toggleContext':
+                tree.contextToggle(action.props['contextName'])
             else:
-                self.logger.error(u'Action not recognized: {}'.format(action.pluginTypeId))
+                self.logger.error(f'Action not recognized: {action.pluginTypeId}')
             self.saveNamespaceStates()
 
     #-------------------------------------------------------------------------------
@@ -201,7 +203,7 @@ class Plugin(indigo.PluginBase):
     #-------------------------------------------------------------------------------
     def changeNamespace(self, valuesDict="", typeId=""):
         errorText = ""
-        baseName = valuesDict.get('baseName',u"")
+        baseName = valuesDict.get('baseName',"")
         if typeId == 'addNamespace':
             if baseName in self.treeDict:
                 errorText = "Base Name already exists"
@@ -220,11 +222,11 @@ class Plugin(indigo.PluginBase):
             if typeId == 'addNamespace':
                 self.treeDict[baseName] = StateTree(self, baseName)
                 self.saveNamespaceStates()
-                self.logger.info(u'>>> namespace "{}" added'.format(baseName))
+                self.logger.info(f'>>> namespace "{baseName}" added')
             elif typeId == 'removeNamespace':
                 del self.treeDict[baseName]
                 self.saveNamespaceStates()
-                self.logger.info(u'>>> namespace "{}" removed'.format(baseName))
+                self.logger.info(f'>>> namespace "{baseName}" removed')
             return (True, valuesDict)
 
     #-------------------------------------------------------------------------------
@@ -246,10 +248,10 @@ class Plugin(indigo.PluginBase):
             tree = self.treeDict[baseName]
             if typeId == 'addContextGroup':
                 tree.groups[groupName] = list(set(item.strip() for item in valuesDict['groupString'].split(',')))
-                self.logger.info(u'>>> context group "{}" added to "{}" namespace'.format(groupName, baseName))
+                self.logger.info(f'>>> context group "{groupName}" added to "{baseName}" namespace')
             elif typeId == 'removeContextGroup':
                 del tree.groups[groupName]
-                self.logger.info(u'>>> context group "{}" removed from "{}" namespace'.format(groupName, baseName))
+                self.logger.info(f'>>> context group "{groupName}" removed from "{baseName}" namespace')
             self.saveNamespaceStates()
             return (True, valuesDict)
 
@@ -260,31 +262,31 @@ class Plugin(indigo.PluginBase):
             return (False, valuesDict, indigo.Dict({'baseName':"Required"}))
         else:
             tree = self.treeDict[baseName]
-            self.logger.info(u'Context Groups for "{}" namespace:'.format(baseName))
+            self.logger.info(f'Context Groups for "{baseName}" namespace:')
             for key, value in tree.groups.items():
-                self.logger.info(u'    {}: {}'.format(key, value))
+                self.logger.info(f'    {key}: {value}')
             return (True, valuesDict)
 
     #-------------------------------------------------------------------------------
     def syncVariables(self, valuesDict="", typeId=""):
-        if valuesDict.get('baseName',u""):
+        if valuesDict.get('baseName',""):
             self.treeDict[valuesDict['baseName']].syncVariables()
         return (True, valuesDict)
 
     #-------------------------------------------------------------------------------
     def toggleDebug(self):
         if self.debug:
-            self.logger.debug(u'Debug logging disabled')
+            self.logger.debug('Debug logging disabled')
             self.debug = False
         else:
             self.debug = True
-            self.logger.debug(u'Debug logging enabled')
+            self.logger.debug('Debug logging enabled')
         self.savePluginPrefs()
 
     #-------------------------------------------------------------------------------
     def toggleLogMissing(self):
         self.logMissing = not self.logMissing
-        self.logger.info(u'Log missing action groups {}'.format(['disabled','enabled'][self.logMissing]))
+        self.logger.info(f"Log missing action groups {['disabled','enabled'][self.logMissing]}")
         self.savePluginPrefs()
 
     #-------------------------------------------------------------------------------
@@ -313,7 +315,7 @@ class Plugin(indigo.PluginBase):
 class StateTree(object):
 
     #-------------------------------------------------------------------------------
-    def __init__(self, plugin, namespace, lastState=u"", priorState=u"", contexts=list(), groups=dict()):
+    def __init__(self, plugin, namespace, lastState="", priorState="", contexts=list(), groups=dict()):
         self.plugin      = plugin
         self.logger      = plugin.logger
         self.sleep       = plugin.sleep
@@ -345,21 +347,21 @@ class StateTree(object):
         with self.lock:
 
             if not newState:
-                self.logger.error(u'>>> no state defined "{}"'.format(self.name+kBaseChar+newState))
+                self.logger.error(f'>>> no state defined "{self.name+kBaseChar+newState}"')
                 return
 
             elif newState == self.lastState:
                 if force:
                     oldBranch = StateBranch(self,"")
                 else:
-                    self.logger.debug(u'>>> already in state "{}"'.format(self.name+kBaseChar+newState))
+                    self.logger.debug(f'>>> already in state "{self.name+kBaseChar+newState}"')
                     return
 
             else:
                 oldBranch = self.branch
 
-            self.logger.info( u'>>> go to state "{}"'.format(self.name+kBaseChar+newState))
-            self.logger.debug(u'>>> from state  "{}"'.format(self.name+kBaseChar+self.lastState))
+            self.logger.info( f'>>> go to state "{self.name+kBaseChar+newState}"')
+            self.logger.debug(f'>>> from state  "{self.name+kBaseChar+self.lastState}"')
 
             newBranch  = StateBranch(self, newState)
 
@@ -397,6 +399,10 @@ class StateTree(object):
             self._changeVariables()
 
     #-------------------------------------------------------------------------------
+    def contextToggle(self, context):
+        self.contextChange(context, context not in self.contexts)
+
+    #-------------------------------------------------------------------------------
     def contextChange(self, context, enterExitBool, force=False):
 
         if force or [(context in self.contexts),(context not in self.contexts)][enterExitBool]:
@@ -409,7 +415,7 @@ class StateTree(object):
                             if item != context:
                                 self.contextChange(item, kExit, force)
 
-            self.logger.info(u'>>> {} context "{}"'.format(['remove','add'][enterExitBool], self.name+kContextChar+context))
+            self.logger.info(f'>>> {["remove","add"][enterExitBool]} context "{self.name+kContextChar+context}"')
             with self.lock:
 
                 # execute global add context action group
@@ -438,12 +444,12 @@ class StateTree(object):
                 self._changeVariables()
 
         else:
-            self.logger.debug(u'>>> context "{}" already {}'.format(self.name+kContextChar+context, ['removed','added'][enterExitBool]))
+            self.logger.debug(f'>>> context "{self.name+kContextChar+context}" already {["removed","added"][enterExitBool]}')
 
     #-------------------------------------------------------------------------------
     def syncVariables(self):
         with self.lock:
-            self.logger.debug(u'syncing variables for namespace "{}"'.format(self.name))
+            self.logger.debug(f'syncing variables for namespace "{self.name}"')
 
             # all variables in namespace folder default to False
             for var in indigo.variables.iter():
@@ -479,25 +485,22 @@ class StateTree(object):
 
     #-------------------------------------------------------------------------------
     def _executeActions(self):
-        self.logger.debug(u'>>> action groups:')
+        self.logger.debug('>>> action groups:')
         pad = max([len(action) for action in self.actionList]) + 1
-        indent = [u'    ',u''][self.plugin.logMissing]
+        indent = ['    ',''][self.plugin.logMissing]
         for action in self.actionList:
             try:
                 indigo.actionGroup.execute(action)
-                self.logger.debug(u'{}{:<{}}: executed'.format(indent,action,pad))
+                self.logger.debug(f'{indent}{action:<{pad}}: executed')
                 self.sleep(self.plugin.actionSleep)
             except Exception as e:
-                # temporary until indigo is fixed
-                if True:
-                #if isinstance(e, ValueError) and e.message.startswith('ElementNotFoundError'):
-                #
+                if isinstance(e, ValueError) and str(e).startswith('ElementNotFoundError'):
                     if self.plugin.logMissing:
-                        self.logger.info(u'{:<{}}: missing'.format(action,pad))
+                        self.logger.info(f'{action:<{pad}}: missing')
                     else:
-                        self.logger.debug(u'{}{:<{}}: missing'.format(indent,action,pad))
+                        self.logger.debug(f'{indent}{action:<{pad}}: missing')
                 else:
-                    self.logger.error(u'{}: action group execute error \n{}'.format(self.name, e))
+                    self.logger.error(f'{self.name}: action group execute error \n{e}')
         self.actionList = list()
 
     #-------------------------------------------------------------------------------
@@ -506,12 +509,12 @@ class StateTree(object):
 
     #-------------------------------------------------------------------------------
     def _changeVariables(self):
-        self.logger.debug(u'>>> variables:')
+        self.logger.debug('>>> variables:')
         pad = max([len(var.name) for var,value in self.variableDict.values()]) + 1
         for varId in self.variableDict:
             var, value = self.variableDict[varId]
-            indigo.variable.updateValue(var.id, unicode(value))
-            self.logger.debug(u'    {:<{}}: {}'.format(var.name,pad,value))
+            indigo.variable.updateValue(var.id, str(value))
+            self.logger.debug(f'    {var.name:<{pad}}: {value}')
         self.variableDict = dict()
 
     #-------------------------------------------------------------------------------
@@ -538,7 +541,7 @@ class StateTree(object):
     #-------------------------------------------------------------------------------
     @property
     def _contextListString(self):
-        return u"[" + u", ".join(u"u'{}'".format(context) for context in self.contexts) + u"]"
+        return "[" + ", ".join(f"'{context}'" for context in self.contexts) + "]"
 
 ################################################################################
 class StateBranch(object):

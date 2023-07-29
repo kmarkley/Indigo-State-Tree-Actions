@@ -102,4 +102,17 @@
 			</Field>
 		</ConfigUI>
 	</Action>
+	<Action id="toggleContext">
+		<Name>Toggle Context</Name>
+		<CallbackMethod>doStateTreeAction</CallbackMethod>
+		<ConfigUI>
+			<Field id="baseName" type="menu">
+				<Label>Base Name:</Label>
+                <List class="self" method="listNamespaces"/>
+			</Field>
+			<Field id="contextName" type="textfield">
+				<Label>Context to toggle:</Label>
+			</Field>
+		</ConfigUI>
+	</Action>
 </Actions>
